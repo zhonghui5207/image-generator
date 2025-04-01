@@ -181,6 +181,69 @@ document.addEventListener('DOMContentLoaded', () => {
     checkFormValidity();
   }
 
+  // 进度条相关元素
+  const progressBar = document.getElementById('progress-bar');
+  const progressText = document.getElementById('progress-text');
+  
+  // 更新进度条函数
+  function updateProgress(percent, statusText) {
+    progressBar.style.width = `${percent}%`;
+    progressText.textContent = `${percent}%`;
+    if (statusText) {
+      loadingStatus.textContent = statusText;
+    }
+  }
+  
+  // 模拟进度函数
+  function simulateProgress() {
+    // 初始进度
+    let progress = 0;
+    updateProgress(0, '准备中...');
+    
+    // 创建一个进度模拟器，模拟图像生成的不同阶段
+    const stages = [
+      { target: 10, speed: 200, text: '正在处理原始图像...' },
+      { target: 30, speed: 300, text: '分析图像特征...' },
+      { target: 50, speed: 400, text: '生成创意概念...' },
+      { target: 70, speed: 500, text: '应用风格转换...' },
+      { target: 90, speed: 600, text: '最终渲染中...' }
+    ];
+    
+    let currentStage = 0;
+    let interval;
+    
+    // 返回一个对象，包含开始和停止进度模拟的方法
+    return {
+      start: function() {
+        interval = setInterval(() => {
+          if (currentStage < stages.length) {
+            const stage = stages[currentStage];
+            
+            if (progress < stage.target) {
+              progress += 1;
+              updateProgress(progress, stage.text);
+            } else {
+              currentStage++;
+            }
+          } else {
+            // 保持在 90%，等待实际完成
+            clearInterval(interval);
+          }
+        }, 150); // 更新频率
+      },
+      complete: function() {
+        clearInterval(interval);
+        updateProgress(100, '生成完成!');
+      },
+      reset: function() {
+        clearInterval(interval);
+        progress = 0;
+        currentStage = 0;
+        updateProgress(0);
+      }
+    };
+  }
+  
   async function handleSubmit(e) {
     e.preventDefault();
     
@@ -191,7 +254,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show loading indicator with message
     loadingIndicator.style.display = 'flex';
     loadingIndicator.querySelector('p').textContent = '正在生成中，请稍候...';
-    loadingStatus.textContent = '准备中...';
+    
+    // 初始化进度条
+    const progress = simulateProgress();
+    progress.start();
     
     // Create form data
     const formData = new FormData();
@@ -200,7 +266,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     try {
       console.log('发送图像生成请求...');
-      loadingStatus.textContent = '正在处理图像并发送到 API...';
       
       // 设置超时时间为 10 分钟
       const controller = new AbortController();
@@ -226,6 +291,9 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingStatus.textContent = '收到响应，正在处理结果...';
         const data = await response.json();
         console.log('响应数据:', data);
+        
+        // 完成进度条
+        progress.complete();
       
         if (data.success) {
           // Display results
@@ -239,6 +307,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = data.result;
             // 不显示文字内容，只保留图像
             resultContent.innerHTML = ''; // 清空文字内容
+            
+            // 检查是否包含速率限制或其他错误信息
+            if (result.includes('rate limit') || result.includes('I can\'t create') || result.includes('can\'t generate')) {
+              // 显示速率限制错误
+              showError('生成图像失败: API 达到速率限制。\n\n错误信息: ' + result);
+              return;
+            }
             
             // 尝试提取图像 URL
             const imgUrlMatch = result.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/i) || 
@@ -301,8 +376,14 @@ document.addEventListener('DOMContentLoaded', () => {
               img.src = imageUrl;
             } else {
               // 如果没有找到图像 URL
-              generatedImageContainer.style.display = 'none';
-              resultContent.textContent = '生成成功，但无法提取图像。';
+              // 检查结果中是否包含错误信息
+              if (result.length > 50) { // 如果结果文本较长，可能是错误信息
+                showError('生成图像失败: API 返回了文本而非图像\n\n返回内容: ' + result.substring(0, 200) + '...');
+                return;
+              } else {
+                generatedImageContainer.style.display = 'none';
+                resultContent.textContent = '生成成功，但无法提取图像。';
+              }
             }
           } else {
             resultContent.textContent = '生成成功，但没有返回内容。';
@@ -322,6 +403,9 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       console.error('错误详情:', error);
       
+      // 重置进度条
+      progress.reset();
+      
       // 清除超时定时器，防止内存泄漏
       clearTimeout(timeoutId);
       
@@ -330,17 +414,39 @@ document.addEventListener('DOMContentLoaded', () => {
         errorMsg = '生成图像超时（超过 10 分钟），请稍后再试。';
       }
       
-      // 显示错误弹窗而不是 alert
+      // 使用增强版错误处理函数
       if (errorMsg) {
-        errorMessage.textContent = errorMsg;
-        errorContainer.style.display = 'block';
+        showError(errorMsg);
       }
     } finally {
-      // Hide loading indicator
-      loadingIndicator.style.display = 'none';
+      // 延迟隐藏加载指示器，给用户时间看到进度条完成或错误状态
+      setTimeout(() => {
+        loadingIndicator.style.display = 'none';
+      }, 1000);
     }
   }
 
+  // 增强版错误处理函数
+  function showError(message) {
+    console.error('错误:', message);
+    
+    // 重置进度条（如果存在）
+    if (typeof progress !== 'undefined' && progress && typeof progress.reset === 'function') {
+      progress.reset();
+    }
+    
+    // 隐藏加载指示器
+    loadingIndicator.style.display = 'none';
+    
+    // 显示错误信息
+    errorMessage.textContent = message;
+    errorContainer.style.display = 'block';
+    
+    // 重置表单状态，确保用户可以重新尝试
+    uploadForm.parentElement.hidden = false;
+    resultContainer.hidden = true;
+  }
+  
   function resetForm() {
     // Reset form
     uploadForm.reset();
