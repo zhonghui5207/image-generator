@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 图像生成器</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- 使用多个CDN源以提高可用性 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" integrity="sha256-HtsXJanqjKTc8vVQjO4YMhiqFoXkfBsjBWcX91T1jr8=" crossorigin="anonymous">
+    <!-- 添加图标回退样式 -->
+    <style>
+        .icon-fallback {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            background-color: #4a6bdf;
+            border-radius: 50%;
+            margin-right: 0.5em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><span class="icon-wrapper"><i class="fas fa-magic"></i><span class="icon-fallback"></span></span> AI 图像生成器</h1>
+            <p>上传图片并添加提示词，使用 GPT-4o 生成创意图像</p>
+        </header>
+
+        <main>
+            <div class="upload-container">
+                <form id="upload-form">
+                    <div class="file-upload">
+                        <div class="file-upload-area" id="drop-area">
+                            <input type="file" id="file-input" accept="image/*" hidden>
+                            <div class="upload-content">
+                                <span class="icon-wrapper"><i class="fas fa-cloud-upload-alt"></i><span class="icon-fallback"></span></span>
+                                <p>拖放图片或点击上传</p>
+                                <span class="file-info">支持 JPG, PNG, GIF (最大 10MB)</span>
+                            </div>
+                            <div class="preview-container" id="preview-container" hidden>
+                                <img id="preview-image" src="#" alt="预览">
+                                <button type="button" id="remove-image" class="remove-btn">
+                                    <span class="icon-wrapper"><i class="fas fa-times"></i><span class="icon-fallback"></span></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="prompt-container">
+                        <label for="prompt">提示词:</label>
+                        <textarea id="prompt" name="prompt" placeholder="描述你想要的图像风格，例如：'将图片转换成文艺复兴时期的油画风格'"></textarea>
+                    </div>
+
+                    <div class="style-presets">
+                        <h3>风格预设:</h3>
+                        <div class="preset-buttons">
+                            <button type="button" class="preset-btn" data-prompt="将图片转换成文艺复兴时期的油画风格">文艺复兴</button>
+                            <button type="button" class="preset-btn" data-prompt="将图片转换成梵高风格的画作">梵高风格</button>
+                            <button type="button" class="preset-btn" data-prompt="将图片转换成水彩画风格">水彩画</button>
+                            <button type="button" class="preset-btn" data-prompt="将图片转换成赛博朋克风格">赛博朋克</button>
+                            <button type="button" class="preset-btn" data-prompt="将图片转换成日本浮世绘风格">浮世绘</button>
+                            <button type="button" class="preset-btn" data-prompt="将图片转换成像素艺术风格">像素艺术</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="generate-btn" class="generate-btn" disabled>
+                        <span class="icon-wrapper"><i class="fas fa-wand-magic-sparkles"></i><span class="icon-fallback"></span></span> 生成图像
+                    </button>
+                </form>
+            </div>
+
+            <div class="result-container" id="result-container" hidden>
+                <h2>生成结果</h2>
+                <div class="comparison">
+                    <div class="image-box">
+                        <h3>原始图像</h3>
+                        <img id="original-image" src="#" alt="原始图像">
+                    </div>
+                    <div class="image-box">
+                        <h3>生成结果</h3>
+                        <!-- 隐藏文字内容，只在需要时显示 -->
+                        <div id="result-content" style="display: none;"></div>
+                        <div id="generated-image-container" class="generated-image-container">
+                            <img id="generated-image" src="#" alt="生成的图像">
+                            <div class="image-actions">
+                                <a id="download-image" href="#" download="generated-image.jpg" class="download-btn">
+                                    <span class="icon-wrapper"><i class="fas fa-download"></i><span class="icon-fallback"></span></span> 下载
+                                </a>
+                                <button id="preview-image-btn" class="preview-btn">
+                                    <span class="icon-wrapper"><i class="fas fa-eye"></i><span class="icon-fallback"></span></span> 预览
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button id="new-generation" class="new-btn">
+                    <span class="icon-wrapper"><i class="fas fa-plus"></i><span class="icon-fallback"></span></span> 新的生成
+                </button>
+            </div>
+        </main>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>正在生成中，请稍候...</p>
+            <div class="loading-status" id="loading-status"></div>
+        </div>
+        
+        <div id="error-container" class="error-container" style="display: none;">
+            <div class="error-content">
+                <span class="icon-wrapper"><i class="fas fa-exclamation-circle"></i><span class="icon-fallback"></span></span>
+                <h3>生成失败</h3>
+                <p id="error-message"></p>
+                <button id="error-close" class="error-close-btn">关闭</button>
+            </div>
+        </div>
+
+        <footer>
+            <p>© 2025 AI 图像生成器 | 使用 OpenAI GPT-4o API</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
