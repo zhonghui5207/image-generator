@@ -85,6 +85,27 @@
                         <textarea id="prompt" name="prompt" placeholder="描述你想要的图像风格，例如：'将图片转换成文艺复兴时期的油画风格'"></textarea>
                     </div>
 
+                    <div class="model-selector">
+                        <h3>选择模型:</h3>
+                        <div class="model-options">
+                            <label class="model-option">
+                                <input type="radio" name="model" value="gpt-4-vision-preview" checked>
+                                <span class="model-name">GPT-4 Vision (默认)</span>
+                                <span class="model-description">标准模型，适合一般图像生成</span>
+                            </label>
+                            <label class="model-option">
+                                <input type="radio" name="model" value="gpt-4o-image">
+                                <span class="model-name">GPT-4o Image</span>
+                                <span class="model-description">基于GPT-4o的图像生成，效果更好</span>
+                            </label>
+                            <label class="model-option">
+                                <input type="radio" name="model" value="gpt-4o-image-vip">
+                                <span class="model-name">GPT-4o Image VIP</span>
+                                <span class="model-description">高级模型，图像质量最佳（消耗2积分）</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="style-presets">
                         <h3>风格预设:</h3>
                         <div class="preset-buttons">

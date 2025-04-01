@@ -88,6 +88,25 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
     const prompt = req.body.prompt || 'Transform this image into a creative style';
     const imagePath = req.file.path;
     const imageType = path.extname(req.file.originalname).substring(1);
+    
+    // 获取所选模型，如果没有指定则使用环境变量中的默认值
+    const selectedModel = req.body.model || process.env.OPENAI_MODEL;
+    console.log("Selected model:", selectedModel);
+    
+    // 确定消耗的积分数量
+    let creditsToUse = 1; // 默认消耗1积分
+    if (selectedModel === 'gpt-4o-image-vip') {
+      creditsToUse = 2; // VIP模型消耗2积分
+    }
+    
+    // 检查用户积分是否足够
+    if (req.user.credits < creditsToUse) {
+      return res.status(402).json({ 
+        success: false, 
+        message: '积分不足，请充值',
+        creditsNeeded: creditsToUse - req.user.credits
+      });
+    }
 
     // Initialize OpenAI client with more detailed configuration
     const openai = new OpenAI({
@@ -108,10 +127,11 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
     }
 
     console.log("Starting image generation request");
-    console.log("Using model:", process.env.OPENAI_MODEL);
+    console.log("Using model:", selectedModel);
     console.log("API Base URL:", process.env.OPENAI_BASE_URL);
     console.log("Prompt:", prompt);
     console.log("Image path:", imagePath);
+    console.log("Credits to use:", creditsToUse);
     
     // 使用 OpenAI 的 API 进行图像生成
     try {
@@ -126,7 +146,7 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
       // 使用 OpenAI 的 chat completions API
       console.log("Sending request to OpenAI API...");
       const response = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL,
+        model: selectedModel,
         messages: [{
           role: 'user', 
           content: [
@@ -172,14 +192,14 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         originalImage: originalImagePath,
         generatedImage: generatedImageUrl,
         prompt: prompt,
-        creditsUsed: 1
+        creditsUsed: creditsToUse  // 使用实际消耗的积分数量
       });
       
       // 扣除用户积分
       const newCreditBalance = await useCredits(
         req.user._id, 
-        1, 
-        '生成图像', 
+        creditsToUse,  // 使用实际消耗的积分数量
+        `生成图像 (${selectedModel})`, 
         imageHistory._id
       );
       
@@ -189,11 +209,12 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         result: response.choices[0].message.content,
         originalImage: originalImagePath,
         credits: {
-          used: 1,
+          used: creditsToUse,
           remaining: newCreditBalance
         },
         updatedCredits: newCreditBalance, // 添加更新后的积分，方便前端直接使用
-        historyId: imageHistory._id
+        historyId: imageHistory._id,
+        model: selectedModel  // 返回使用的模型名称
       });
     } catch (apiError) {
       console.error('OpenAI API Error:');

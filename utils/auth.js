@@ -65,13 +65,22 @@ export const authenticate = async (req, res, next) => {
 export const checkCredits = async (req, res, next) => {
   try {
     const { user } = req;
-    const requiredCredits = 1; // 每次生成图像消耗1积分
+    
+    // 获取所选模型，默认使用环境变量中的模型
+    const selectedModel = req.body.model || process.env.OPENAI_MODEL;
+    
+    // 确定所需积分数量
+    let requiredCredits = 1; // 默认消耗1积分
+    if (selectedModel === 'gpt-4o-image-vip') {
+      requiredCredits = 2; // VIP模型消耗2积分
+    }
     
     if (user.credits < requiredCredits) {
       return res.status(402).json({ 
         success: false, 
         message: '积分不足，请充值',
-        creditsNeeded: requiredCredits - user.credits
+        creditsNeeded: requiredCredits - user.credits,
+        requiredCredits: requiredCredits
       });
     }
     

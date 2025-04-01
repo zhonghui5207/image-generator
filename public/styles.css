@@ -560,3 +560,80 @@ footer {
   color: var(--secondary-color);
   border-top: 1px solid #eee;
 }
+
+/* 模型选择器样式 */
+.model-selector {
+  margin-bottom: 20px;
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.model-selector h3 {
+  font-size: 1rem;
+  margin-bottom: 10px;
+  color: #343a40;
+}
+
+.model-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.model-option {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex-wrap: wrap;
+}
+
+.model-option:hover {
+  background-color: #e9ecef;
+}
+
+.model-option input[type="radio"] {
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+.model-option input[type="radio"]:checked + .model-name {
+  color: var(--primary-color);
+  font-weight: bold;
+}
+
+.model-name {
+  font-weight: 500;
+  margin-right: 10px;
+  color: #333;
+}
+
+.model-description {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-left: 24px;
+  display: block;
+  width: 100%;
+  margin-top: 3px;
+}
+
+@media (min-width: 768px) {
+  .model-options {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  
+  .model-option {
+    flex: 1;
+    min-width: 200px;
+    max-width: calc(33.33% - 10px);
+  }
+  
+  .model-description {
+    margin-left: 0;
+  }
+}
