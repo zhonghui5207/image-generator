@@ -6,6 +6,18 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { OpenAI } from 'openai';
 import https from 'https';
+import cookieParser from 'cookie-parser';
+import mongoose from './models/db.js';
+
+// 导入路由
+import authRoutes from './routes/authRoutes.js';
+import creditRoutes from './routes/creditRoutes.js';
+import imageHistoryRoutes from './routes/imageHistoryRoutes.js';
+
+// 导入中间件和工具
+import { authenticate, checkCredits } from './utils/auth.js';
+import { useCredits } from './routes/creditRoutes.js';
+import GeneratedImage from './models/GeneratedImage.js';
 
 // Load environment variables
 dotenv.config();
@@ -17,6 +29,9 @@ const __dirname = path.dirname(__filename);
 // Initialize Express app
 const app = express();
 const port = process.env.PORT || 3000;
+
+// 添加中间件
+app.use(cookieParser()); // 解析cookie
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -52,6 +67,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.json());
 
+// 注册API路由
+app.use('/api/auth', authRoutes);
+app.use('/api/credits', creditRoutes);
+app.use('/api/history', imageHistoryRoutes);
+
 // Helper function to convert image to base64
 function image2Base64(imagePath) {
   const image = fs.readFileSync(imagePath);
@@ -59,7 +79,7 @@ function image2Base64(imagePath) {
 }
 
 // API endpoint for image generation
-app.post('/api/generate-image', upload.single('image'), async (req, res) => {
+app.post('/api/generate-image', authenticate, checkCredits, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No image uploaded' });
@@ -133,11 +153,47 @@ app.post('/api/generate-image', upload.single('image'), async (req, res) => {
         console.log("No choices in response");
       }
 
+      // 保存生成的图像记录
+      const originalImagePath = `/uploads/${path.basename(imagePath)}`;
+      
+      // 尝试提取生成的图像URL
+      const result = response.choices[0].message.content;
+      const imgUrlMatch = result.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/i) || 
+                          result.match(/\bhttps?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp)\b/i);
+      
+      let generatedImageUrl = '';
+      if (imgUrlMatch && imgUrlMatch[1]) {
+        generatedImageUrl = imgUrlMatch[1];
+      }
+      
+      // 创建历史记录
+      const imageHistory = await GeneratedImage.create({
+        user: req.user._id,
+        originalImage: originalImagePath,
+        generatedImage: generatedImageUrl,
+        prompt: prompt,
+        creditsUsed: 1
+      });
+      
+      // 扣除用户积分
+      const newCreditBalance = await useCredits(
+        req.user._id, 
+        1, 
+        '生成图像', 
+        imageHistory._id
+      );
+      
       // 发送响应回客户端
       res.json({ 
         success: true, 
         result: response.choices[0].message.content,
-        originalImage: `/uploads/${path.basename(imagePath)}`
+        originalImage: originalImagePath,
+        credits: {
+          used: 1,
+          remaining: newCreditBalance
+        },
+        updatedCredits: newCreditBalance, // 添加更新后的积分，方便前端直接使用
+        historyId: imageHistory._id
       });
     } catch (apiError) {
       console.error('OpenAI API Error:');

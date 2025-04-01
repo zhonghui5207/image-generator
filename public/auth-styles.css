@@ -1,0 +1,197 @@
+/* 导航栏样式优化 */
+.main-nav {
+  margin-top: 15px;
+}
+
+.main-nav ul {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.main-nav li {
+  margin: 0 10px;
+}
+
+.main-nav a {
+  display: block;
+  padding: 8px 15px;
+  color: #4a6bdf;
+  text-decoration: none;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.main-nav a:hover, .main-nav a.active {
+  background-color: #4a6bdf;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 登录注册按钮特殊样式 */
+#login-link, #register-link {
+  background-color: #f8f9fa;
+  border: 1px solid #4a6bdf;
+}
+
+#logout-btn {
+  background-color: #f8f9fa;
+  border: 1px solid #dc3545;
+  color: #dc3545;
+}
+
+#logout-btn:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+/* 积分显示区域样式 */
+.credits-info {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 15px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.credits-balance {
+  display: flex;
+  align-items: center;
+}
+
+.credits-amount {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #4a6bdf;
+  margin-right: 10px;
+}
+
+.credits-label {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.credits-message {
+  display: flex;
+  align-items: center;
+}
+
+.credits-message p {
+  margin: 0 15px 0 0;
+  color: #6c757d;
+}
+
+.buy-credits-link {
+  display: inline-block;
+  padding: 6px 12px;
+  background-color: #28a745;
+  color: white;
+  text-decoration: none;
+  border-radius: 20px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.buy-credits-link:hover {
+  background-color: #218838;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 未登录提示横幅 */
+.auth-banner {
+  background-color: #f8f9fa;
+  border-left: 4px solid #4a6bdf;
+  border-radius: 4px;
+  padding: 15px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.auth-banner p {
+  margin: 0;
+  color: #495057;
+}
+
+.auth-banner p i {
+  color: #4a6bdf;
+  margin-right: 5px;
+}
+
+.auth-banner-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (min-width: 768px) {
+  .auth-banner {
+    flex-wrap: nowrap;
+  }
+  
+  .auth-banner-buttons {
+    margin-top: 0;
+  }
+}
+
+.auth-banner-btn {
+  padding: 6px 15px;
+  border-radius: 20px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.login-btn {
+  background-color: #4a6bdf;
+  color: white;
+}
+
+.login-btn:hover {
+  background-color: #3a59c7;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.register-btn {
+  background-color: white;
+  color: #4a6bdf;
+  border: 1px solid #4a6bdf;
+}
+
+.register-btn:hover {
+  background-color: #f0f4ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .credits-info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .credits-message {
+    margin-top: 10px;
+  }
+  
+  .main-nav ul {
+    justify-content: center;
+  }
+  
+  .main-nav li {
+    margin: 5px;
+  }
+}

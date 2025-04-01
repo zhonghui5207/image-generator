@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 图像生成器</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="auth.css">
+    <link rel="stylesheet" href="auth-styles.css">
     <!-- 使用多个CDN源以提高可用性 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" integrity="sha256-HtsXJanqjKTc8vVQjO4YMhiqFoXkfBsjBWcX91T1jr8=" crossorigin="anonymous">
@@ -25,9 +27,40 @@
         <header>
             <h1><span class="icon-wrapper"><i class="fas fa-magic"></i><span class="icon-fallback"></span></span> AI 图像生成器</h1>
             <p>上传图片并添加提示词，使用 GPT-4o 生成创意图像</p>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="index.html" class="active">首页</a></li>
+                    <li><a href="profile.html" id="profile-link" class="auth-required">个人中心</a></li>
+                    <li><a href="credits.html" id="credits-link" class="auth-required">购买积分</a></li>
+                    <li><a href="login.html" id="login-link" class="auth-not-required">登录</a></li>
+                    <li><a href="register.html" id="register-link" class="auth-not-required">注册</a></li>
+                    <li><a href="#" id="logout-btn" class="auth-required">退出登录</a></li>
+                </ul>
+            </nav>
         </header>
 
         <main>
+            <!-- 积分显示区域 -->
+            <div class="credits-info auth-required" id="credits-info" style="display: none;">
+                <div class="credits-balance">
+                    <div class="credits-amount" id="credits-amount">0</div>
+                    <div class="credits-label">当前积分余额</div>
+                </div>
+                <div class="credits-message">
+                    <p><i class="fas fa-coins"></i> 每次生成图像消耗 1 积分</p>
+                    <a href="credits.html" class="buy-credits-link"><i class="fas fa-plus-circle"></i> 购买积分</a>
+                </div>
+            </div>
+
+            <!-- 未登录提示 -->
+            <div class="auth-banner auth-not-required" id="auth-banner" style="display: none;">
+                <p><i class="fas fa-info-circle"></i> 登录或注册账户可以获得<strong>10个免费积分</strong>并保存生成历史</p>
+                <div class="auth-banner-buttons">
+                    <a href="login.html" class="auth-banner-btn login-btn"><i class="fas fa-sign-in-alt"></i> 登录</a>
+                    <a href="register.html" class="auth-banner-btn register-btn"><i class="fas fa-user-plus"></i> 注册</a>
+                </div>
+            </div>
+
             <div class="upload-container">
                 <form id="upload-form">
                     <div class="file-upload">
@@ -125,5 +158,6 @@
     </div>
 
     <script src="script.js"></script>
+    <script src="auth-ui.js"></script>
 </body>
 </html>

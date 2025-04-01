@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 - AI 图像生成器</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="auth.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><span class="icon-wrapper"><i class="fas fa-magic"></i><span class="icon-fallback"></span></span> AI 图像生成器</h1>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="index.html">首页</a></li>
+                    <li><a href="profile.html" class="active">个人中心</a></li>
+                    <li><a href="credits.html">购买积分</a></li>
+                    <li><a href="#" id="logout-btn">退出登录</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            <div class="profile-container">
+                <div class="profile-header">
+                    <div class="user-info">
+                        <h2>个人信息</h2>
+                        <div class="user-details">
+                            <p><strong>用户名:</strong> <span id="username"></span></p>
+                            <p><strong>邮箱:</strong> <span id="email"></span></p>
+                            <p><strong>积分余额:</strong> <span id="credits"></span></p>
+                            <p><strong>注册时间:</strong> <span id="created-at"></span></p>
+                        </div>
+                    </div>
+                    <div class="credits-summary">
+                        <div class="credits-amount" id="credits-amount">0</div>
+                        <div class="credits-label">积分余额</div>
+                        <a href="credits.html" class="buy-credits-link">购买积分</a>
+                    </div>
+                </div>
+
+                <div class="history-container">
+                    <h2>生成历史</h2>
+                    <div class="history-filters">
+                        <select id="history-sort">
+                            <option value="newest">最新优先</option>
+                            <option value="oldest">最早优先</option>
+                        </select>
+                    </div>
+                    <div class="history-grid" id="history-grid">
+                        <!-- 历史记录将通过JavaScript动态加载 -->
+                        <div class="empty-history">暂无生成历史</div>
+                    </div>
+                    <div class="pagination" id="pagination">
+                        <!-- 分页控件将通过JavaScript动态加载 -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>© 2025 AI 图像生成器 | 使用 OpenAI GPT-4o API</p>
+        </footer>
+    </div>
+
+    <!-- 图像详情模态框 -->
+    <div id="image-modal" class="modal">
+        <div class="modal-content image-modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>图像详情</h2>
+            <div class="image-details">
+                <div class="image-comparison">
+                    <div class="original-image">
+                        <h3>原始图像</h3>
+                        <img id="modal-original-image" src="#" alt="原始图像">
+                    </div>
+                    <div class="generated-image">
+                        <h3>生成结果</h3>
+                        <img id="modal-generated-image" src="#" alt="生成结果">
+                    </div>
+                </div>
+                <div class="image-info">
+                    <p><strong>提示词:</strong> <span id="modal-prompt"></span></p>
+                    <p><strong>生成时间:</strong> <span id="modal-created-at"></span></p>
+                    <p><strong>消耗积分:</strong> <span id="modal-credits-used"></span></p>
+                </div>
+                <div class="image-actions">
+                    <a id="modal-download-btn" href="#" download class="download-btn">
+                        <i class="fas fa-download"></i> 下载图像
+                    </a>
+                    <button id="modal-regenerate-btn" class="regenerate-btn">
+                        <i class="fas fa-sync-alt"></i> 重新生成
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="profile.js"></script>
+</body>
+</html>

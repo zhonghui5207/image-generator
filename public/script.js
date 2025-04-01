@@ -28,6 +28,40 @@ document.addEventListener('DOMContentLoaded', () => {
   if (generatedImageContainer) {
     generatedImageContainer.style.display = 'none';
   }
+  
+  // 从服务器获取最新的用户信息
+  async function fetchUserProfile() {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user) return;
+    
+    try {
+      const response = await fetch('/api/auth/profile', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // 更新本地存储的用户信息
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        // 更新页面上的积分显示
+        const creditsAmount = document.getElementById('credits-amount');
+        if (creditsAmount && data.user.credits !== undefined) {
+          creditsAmount.textContent = data.user.credits;
+        }
+      } else if (response.status === 401) {
+        // 如果认证失败（token过期等），清除本地存储
+        localStorage.removeItem('user');
+        // 刷新页面以更新UI状态
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('获取用户信息失败:', error);
+    }
+  }
 
   // Variables
   let selectedFile = null;
@@ -250,6 +284,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!selectedFile || !promptInput.value.trim()) {
       return;
     }
+    
+    // 检查用户是否已登录
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user) {
+      // 显示登录提示
+      const authBanner = document.getElementById('auth-banner');
+      if (authBanner) {
+        authBanner.style.display = '';
+        // 滚动到提示区域
+        authBanner.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+    
+    // 检查用户是否有足够积分
+    if (user.credits < 1) {
+      alert('您的积分不足，请购买积分后再生成图像。');
+      window.location.href = '/credits.html';
+      return;
+    }
 
     // Show loading indicator with message
     loadingIndicator.style.display = 'flex';
@@ -296,6 +350,23 @@ document.addEventListener('DOMContentLoaded', () => {
         progress.complete();
       
         if (data.success) {
+          // 更新用户积分（从响应中获取或重新获取用户信息）
+          if (data.updatedCredits !== undefined) {
+            // 如果API返回了更新后的积分
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            user.credits = data.updatedCredits;
+            localStorage.setItem('user', JSON.stringify(user));
+            
+            // 更新页面上的积分显示
+            const creditsAmount = document.getElementById('credits-amount');
+            if (creditsAmount) {
+              creditsAmount.textContent = data.updatedCredits;
+            }
+          } else {
+            // 如果API没有返回积分，则刷新用户信息
+            fetchUserProfile();
+          }
+          
           // Display results
           originalImage.src = data.originalImage;
           
