@@ -94,9 +94,24 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
     console.log("Selected model:", selectedModel);
     
     // 确定消耗的积分数量
-    let creditsToUse = 1; // 默认消耗1积分
-    if (selectedModel === 'gpt-4o-image-vip') {
-      creditsToUse = 2; // VIP模型消耗2积分
+    let creditsToUse;
+    
+    // 根据不同模型设置积分消耗
+    switch (selectedModel) {
+      case 'gpt-4-vision-preview':
+        creditsToUse = 2; // 快速稳定出图，质量一般，DELL生图
+        break;
+      case 'gpt-4o-image':
+        creditsToUse = 4; // 稳定性一般，质量好，出图慢，4o生图
+        break;
+      case 'gpt-4o-all':
+        creditsToUse = 5; // 比较稳定，质量好，出图慢，4o生图
+        break;
+      case 'gpt-4o-image-vip':
+        creditsToUse = 8; // 稳定性强，质量好，出图慢，4o生图
+        break;
+      default:
+        creditsToUse = 2; // 默认使用最低积分
     }
     
     // 检查用户积分是否足够
@@ -148,25 +163,150 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
       
       // 使用 OpenAI 的 chat completions API
       console.log("Sending request to OpenAI API...");
-      const response = await openai.chat.completions.create({
-        model: selectedModel,
-        messages: [{
-          role: 'user', 
-          content: [
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/${imageType};base64,${imageBase64}`
-              }
+      // 检查是否请求流式响应
+      const useStream = req.query.stream === 'true';
+      
+      if (useStream) {
+        // 流式响应处理
+        console.log("Using streaming response");
+        
+        // 设置响应头信息以支持流式传输
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        
+        // 创建流式请求
+        const stream = await openai.chat.completions.create({
+          model: selectedModel,
+          messages: [{
+            role: 'user', 
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/${imageType};base64,${imageBase64}`
+                }
+              },
+              {
+                type: "text",
+                text: prompt
+              },
+            ]
+          }],
+          stream: true,
+          timeout: 300000  // 增加到 5 分钟超时
+        });
+        
+        console.log("流式连接已建立，开始发送数据...");
+        
+        // 向客户端发送初始信息
+        res.write(`data: ${JSON.stringify({
+          type: 'info',
+          content: {
+            originalImage: `/uploads/${path.basename(imagePath)}`,
+            creditsUsed: creditsToUse
+          }
+        })}\n\n`);
+        
+        // 收集完整响应内容（用于处理图像 URL 和历史记录）
+        let fullContent = '';
+        
+        // 处理流式响应
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || '';
+          if (content) {
+            fullContent += content;
+            
+            // 将每个数据块发送给客户端
+            res.write(`data: ${JSON.stringify({
+              type: 'content',
+              content: content
+            })}\n\n`);
+          }
+        }
+        
+        console.log("流式响应完成，总内容长度:", fullContent.length);
+        
+        // 处理图像 URL 提取
+        let generatedImageUrl = '';
+        console.log('处理图像 URL 提取，原始结果:', fullContent);
+        
+        // 尝试匹配图像 URL
+        let imgUrlMatch = fullContent.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/i);
+        if (!imgUrlMatch) {
+          imgUrlMatch = fullContent.match(/\[下载[^\]]*\]\((https?:\/\/[^\s)]+)\)/i);
+        }
+        if (!imgUrlMatch) {
+          imgUrlMatch = fullContent.match(/(https?:\/\/oaiusercontent[^\s"'<>]+)/i);
+        }
+        
+        if (imgUrlMatch && imgUrlMatch[1]) {
+          generatedImageUrl = imgUrlMatch[1];
+        } else if (imgUrlMatch && imgUrlMatch[0] && imgUrlMatch[0].startsWith('http')) {
+          generatedImageUrl = imgUrlMatch[0];
+        }
+        
+        if (!generatedImageUrl) {
+          console.log('未找到图像 URL，使用原始图像作为占位');
+          generatedImageUrl = `/uploads/${path.basename(imagePath)}`;
+        }
+        
+        // 扣除用户积分
+        const newCreditBalance = await useCredits(
+          req.user._id, 
+          creditsToUse,
+          `生成图像 (${selectedModel})`,
+          null
+        );
+        
+        // 创建历史记录
+        const imageHistory = await GeneratedImage.create({
+          user: req.user._id,
+          originalImage: `/uploads/${path.basename(imagePath)}`,
+          generatedImage: generatedImageUrl,
+          prompt: prompt,
+          creditsUsed: creditsToUse
+        });
+        
+        // 发送最终结果
+        res.write(`data: ${JSON.stringify({
+          type: 'result',
+          content: {
+            success: true,
+            generatedImageUrl: generatedImageUrl,
+            credits: {
+              used: creditsToUse,
+              remaining: newCreditBalance
             },
-            {
-              type: "text",
-              text: prompt
-            },
-          ]
-        }],
-        timeout: 300000  // 增加到 5 分钟超时
-      });
+            historyId: imageHistory._id
+          }
+        })}\n\n`);
+        
+        // 结束流式响应
+        res.end();
+        return;
+      } else {
+        // 非流式响应处理（原有方式）
+        const response = await openai.chat.completions.create({
+          model: selectedModel,
+          messages: [{
+            role: 'user', 
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/${imageType};base64,${imageBase64}`
+                }
+              },
+              {
+                type: "text",
+                text: prompt
+              },
+            ]
+          }],
+          timeout: 300000  // 增加到 5 分钟超时
+        });
+      }
 
         console.log("Chat API response received");
         console.log("Response structure:", JSON.stringify(Object.keys(response)));

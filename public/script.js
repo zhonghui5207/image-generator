@@ -268,6 +268,134 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
   
+  // 处理流式响应
+  async function handleStreamResponse(formData) {
+    try {
+      // 创建进度对象
+      const progress = simulateProgress();
+      progress.start();
+      
+      updateProgress(20, '建立流式连接...');
+      
+      // 创建 EventSource 对象连接服务器发送的事件流
+      const formDataForUrl = new URLSearchParams();
+      formDataForUrl.append('stream', 'true');
+      
+      // 使用 fetch 上传文件
+      const uploadResponse = await fetch('/api/generate-image?stream=true', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || '上传文件失败');
+      }
+      
+      // 创建用于显示结果的元素
+      resultContent.style.display = 'block';
+      resultContent.innerHTML = '<div class="streaming-content"></div>';
+      const streamingContent = resultContent.querySelector('.streaming-content');
+      
+      // 设置流式连接的处理函数
+      const reader = uploadResponse.body.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      let originalImagePath = '';
+      let generatedImageUrl = '';
+      
+      updateProgress(40, '接收数据中...');
+      
+      // 处理数据流
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        // 解码数据
+        const text = decoder.decode(value);
+        const lines = text.split('\n\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+              
+              // 根据数据类型处理
+              if (data.type === 'info') {
+                // 初始信息
+                originalImagePath = data.content.originalImage;
+                originalImage.src = originalImagePath;
+                updateProgress(50, '正在生成图像...');
+              } else if (data.type === 'content') {
+                // 流式内容
+                fullContent += data.content;
+                streamingContent.innerHTML = fullContent;
+                updateProgress(60, '接收数据中...');
+              } else if (data.type === 'result') {
+                // 最终结果
+                generatedImageUrl = data.content.generatedImageUrl;
+                
+                // 更新用户积分
+                if (data.content.credits) {
+                  const user = JSON.parse(localStorage.getItem('user') || '{}');
+                  user.credits = data.content.credits.remaining;
+                  localStorage.setItem('user', JSON.stringify(user));
+                  
+                  // 更新页面上的积分显示
+                  const creditsAmount = document.getElementById('credits-amount');
+                  if (creditsAmount) {
+                    creditsAmount.textContent = data.content.credits.remaining;
+                  }
+                }
+                
+                updateProgress(90, '处理生成的图像...');
+              }
+            } catch (e) {
+              console.error('解析数据错误:', e);
+            }
+          }
+        }
+      }
+      
+      // 处理生成的图像
+      if (generatedImageUrl) {
+        // 将图像 URL 设置到图像元素
+        generatedImage.src = generatedImageUrl;
+        downloadImageBtn.href = generatedImageUrl;
+        downloadImageBtn.download = 'generated-image.jpg';
+        
+        // 设置预览功能
+        previewImageBtn.onclick = function(e) {
+          e.preventDefault();
+          window.open(generatedImageUrl, '_blank');
+        };
+        
+        // 显示图像容器
+        generatedImageContainer.style.display = 'block';
+      } else {
+        // 如果没有图像 URL
+        generatedImageContainer.style.display = 'none';
+        resultContent.innerHTML = '生成成功，但无法提取图像。';
+      }
+      
+      // 完成进度
+      progress.complete();
+      
+      // 显示结果容器
+      uploadForm.parentElement.hidden = true;
+      resultContainer.hidden = false;
+      
+    } catch (error) {
+      console.error('流式响应错误:', error);
+      showError(error.message || '处理流式响应时出错');
+    } finally {
+      // 延迟隐藏加载指示器
+      setTimeout(() => {
+        loadingIndicator.style.display = 'none';
+      }, 1000);
+    }
+  }
+  
   async function handleSubmit(e) {
     e.preventDefault();
 
@@ -308,7 +436,21 @@ document.addEventListener('DOMContentLoaded', () => {
       formData.append('image', selectedFile);
       formData.append('prompt', prompt);
       formData.append('model', selectedModel); // 添加选择的模型
+      
+      // 创建进度对象
+      const progress = simulateProgress();
+      progress.start();
 
+      // 检查是否使用流式响应
+      const useStream = true; // 默认使用流式响应
+      
+      if (useStream) {
+        // 使用流式响应处理
+        await handleStreamResponse(formData);
+        return;
+      }
+      
+      // 非流式响应处理（原有方式）
       updateProgress(20, '上传图片中...');
 
       // 发送请求到服务器
