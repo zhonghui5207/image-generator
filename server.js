@@ -212,8 +212,14 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         let fullContent = '';
         
         // 处理流式响应
+        let chunkCount = 0;
+        const startTime = Date.now();
+        console.log(`[${new Date().toISOString()}] 开始接收流式数据`);
+        
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || '';
+          chunkCount++;
+          
           if (content) {
             fullContent += content;
             
@@ -222,10 +228,17 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
               type: 'content',
               content: content
             })}\n\n`);
+            
+            // 每10个数据块打印一次进度
+            if (chunkCount % 10 === 0) {
+              const elapsedSeconds = (Date.now() - startTime) / 1000;
+              console.log(`[${new Date().toISOString()}] 已接收 ${chunkCount} 个数据块，内容长度: ${fullContent.length}，已用时间: ${elapsedSeconds.toFixed(1)}秒`);
+            }
           }
         }
         
-        console.log("流式响应完成，总内容长度:", fullContent.length);
+        const totalTime = (Date.now() - startTime) / 1000;
+        console.log(`[${new Date().toISOString()}] 流式响应完成，共接收 ${chunkCount} 个数据块，总内容长度: ${fullContent.length}，总用时: ${totalTime.toFixed(1)}秒`);
         
         // 处理图像 URL 提取
         let generatedImageUrl = '';
@@ -306,7 +319,6 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           }],
           timeout: 300000  // 增加到 5 分钟超时
         });
-      }
 
         console.log("Chat API response received");
         console.log("Response structure:", JSON.stringify(Object.keys(response)));
@@ -316,85 +328,78 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           console.log("No choices in response");
         }
         
-      console.log("Response received from OpenAI API");
-      console.log("Response structure:", JSON.stringify(Object.keys(response)));
-      if (response.choices && response.choices.length > 0) {
-        console.log("First choice:", JSON.stringify(response.choices[0]));
-      } else {
-        console.log("No choices in response");
-      }
-
-      // 从响应中提取图像 URL
-      let generatedImageUrl = '';
-      
-      if (response.choices && response.choices.length > 0) {
-        const result = response.choices[0].message.content;
-        console.log('处理图像 URL 提取，原始结果:', result);
+        // 从响应中提取图像 URL
+        let generatedImageUrl = '';
         
-        // 尝试匹配图像 URL
-        // 1. 先尝试匹配 Markdown 格式的图像链接
-        let imgUrlMatch = result.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/i);
-        
-        // 2. 如果没有找到，尝试匹配下载链接
-        if (!imgUrlMatch) {
-          imgUrlMatch = result.match(/\[\u4e0b\u8f7d[^\]]*\]\((https?:\/\/[^\s)]+)\)/i);
+        if (response.choices && response.choices.length > 0) {
+          const result = response.choices[0].message.content;
+          console.log('处理图像 URL 提取，原始结果:', result);
+          
+          // 尝试匹配图像 URL
+          // 1. 先尝试匹配 Markdown 格式的图像链接
+          let imgUrlMatch = result.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/i);
+          
+          // 2. 如果没有找到，尝试匹配下载链接
+          if (!imgUrlMatch) {
+            imgUrlMatch = result.match(/\[\u4e0b\u8f7d[^\]]*\]\((https?:\/\/[^\s)]+)\)/i);
+          }
+          
+          // 3. 如果还是没有找到，尝试匹配 OpenAI 特有的 oaiusercontent 链接
+          if (!imgUrlMatch) {
+            imgUrlMatch = result.match(/(https?:\/\/oaiusercontent[^\s"'<>]+)/i);
+          }
+          
+          console.log('图像 URL 匹配结果:', imgUrlMatch);
+          
+          // 从匹配结果中提取 URL
+          if (imgUrlMatch && imgUrlMatch[1]) {
+            // 如果有捕获组，使用第一个捕获组
+            generatedImageUrl = imgUrlMatch[1];
+          } else if (imgUrlMatch && imgUrlMatch[0] && imgUrlMatch[0].startsWith('http')) {
+            // 如果没有捕获组，但整个匹配是 URL
+            generatedImageUrl = imgUrlMatch[0];
+          }
+          
+          console.log('提取的图像 URL:', generatedImageUrl);
         }
         
-        // 3. 如果还是没有找到，尝试匹配 OpenAI 特有的 oaiusercontent 链接
-        if (!imgUrlMatch) {
-          imgUrlMatch = result.match(/(https?:\/\/oaiusercontent[^\s"'<>]+)/i);
+        // 如果没有找到图像 URL，使用原始图像作为占位
+        if (!generatedImageUrl) {
+          console.log('未找到图像 URL，使用原始图像作为占位');
+          generatedImageUrl = originalImagePath;
         }
         
-        console.log('图像 URL 匹配结果:', imgUrlMatch);
+        // 创建历史记录
+        const imageHistory = await GeneratedImage.create({
+          user: req.user._id,
+          originalImage: originalImagePath,
+          generatedImage: generatedImageUrl,
+          prompt: prompt,
+          creditsUsed: creditsToUse  // 使用实际消耗的积分数量
+        });
         
-        // 从匹配结果中提取 URL
-        if (imgUrlMatch && imgUrlMatch[1]) {
-          // 如果有捕获组，使用第一个捕获组
-          generatedImageUrl = imgUrlMatch[1];
-        } else if (imgUrlMatch && imgUrlMatch[0] && imgUrlMatch[0].startsWith('http')) {
-          // 如果没有捕获组，但整个匹配是 URL
-          generatedImageUrl = imgUrlMatch[0];
-        }
+        // 扣除用户积分
+        const newCreditBalance = await useCredits(
+          req.user._id, 
+          creditsToUse,  // 使用实际消耗的积分数量
+          `生成图像 (${selectedModel})`, 
+          imageHistory._id
+        );
         
-        console.log('提取的图像 URL:', generatedImageUrl);
+        // 发送响应回客户端
+        res.json({ 
+          success: true, 
+          result: response.choices[0].message.content,
+          originalImage: originalImagePath,
+          credits: {
+            used: creditsToUse,
+            remaining: newCreditBalance
+          },
+          updatedCredits: newCreditBalance, // 添加更新后的积分，方便前端直接使用
+          historyId: imageHistory._id,
+          model: selectedModel  // 返回使用的模型名称
+        });
       }
-      
-      // 如果没有找到图像 URL，使用原始图像作为占位
-      if (!generatedImageUrl) {
-        console.log('未找到图像 URL，使用原始图像作为占位');
-        generatedImageUrl = originalImagePath;
-      }
-      
-      // 创建历史记录
-      const imageHistory = await GeneratedImage.create({
-        user: req.user._id,
-        originalImage: originalImagePath,
-        generatedImage: generatedImageUrl,
-        prompt: prompt,
-        creditsUsed: creditsToUse  // 使用实际消耗的积分数量
-      });
-      
-      // 扣除用户积分
-      const newCreditBalance = await useCredits(
-        req.user._id, 
-        creditsToUse,  // 使用实际消耗的积分数量
-        `生成图像 (${selectedModel})`, 
-        imageHistory._id
-      );
-      
-      // 发送响应回客户端
-      res.json({ 
-        success: true, 
-        result: response.choices[0].message.content,
-        originalImage: originalImagePath,
-        credits: {
-          used: creditsToUse,
-          remaining: newCreditBalance
-        },
-        updatedCredits: newCreditBalance, // 添加更新后的积分，方便前端直接使用
-        historyId: imageHistory._id,
-        model: selectedModel  // 返回使用的模型名称
-      });
     } catch (apiError) {
       console.error('OpenAI API Error:');
       console.error('Error name:', apiError.name);
@@ -421,18 +426,27 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
       } else if (apiError.message.includes('429')) {
         errorMessage = '请求频率超限。请稍后再试。';
         statusCode = 429;
+      } else if (apiError.message.includes('Premature close')) {
+        errorMessage = '连接过早关闭。这可能是由于网络问题或代理设置导致的。';
+        console.error('请检查您的网络连接和代理设置');
       }
       
-      res.status(statusCode).json({ 
-        error: errorMessage, 
-        details: apiError.message,
-        apiResponse: apiError.response?.data || null
-      });
+      // 只在尚未发送响应时发送错误响应
+      if (!res.headersSent) {
+        res.status(statusCode).json({ 
+          error: errorMessage, 
+          details: apiError.message,
+          apiResponse: apiError.response?.data || null
+        });
+      }
     }
     
   } catch (error) {
     console.error('Error processing image:', error);
-    res.status(500).json({ error: 'Error processing image', details: error.message });
+    // 只在尚未发送响应时发送错误响应
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Error processing image', details: error.message });
+    }
   }
 });
 

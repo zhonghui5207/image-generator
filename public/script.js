@@ -216,58 +216,212 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Functions for loading progress
-  function updateProgress(percent, statusText) {
+  function updateProgress(percent, statusText, estimatedTime) {
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
     const loadingStatus = document.getElementById('loading-status');
+    const timeEstimate = document.getElementById('time-estimate');
     
-    if (progressBar) progressBar.style.width = `${percent}%`;
-    if (progressText) progressText.textContent = `${percent}%`;
+    // 对百分比进行取整，避免小数
+    const roundedPercent = Math.round(percent);
+    
+    if (progressBar) progressBar.style.width = `${roundedPercent}%`;
+    if (progressText) progressText.textContent = `${roundedPercent}%`;
     if (loadingStatus && statusText) loadingStatus.textContent = statusText;
+    
+    // 显示预估时间
+    if (timeEstimate && estimatedTime !== undefined) {
+      if (estimatedTime === 0) {
+        timeEstimate.style.display = 'none';
+      } else {
+        timeEstimate.style.display = 'block';
+        timeEstimate.textContent = `预计剩余时间: ${estimatedTime}秒`;
+      }
+    }
   }
   
-  // 模拟进度条
+  // 模拟进度条 - 改进版，避免初始跳跃
   function simulateProgress() {
     let progressValue = 0;
     let intervalId = null;
-    const progressBar = document.getElementById('progress-bar');
-    const progressText = document.getElementById('progress-text');
+    let startTime = Date.now();
+    const totalEstimatedTime = 60; // 默认估计生成需要60秒
+    let remainingTime = totalEstimatedTime;
     
     return {
       start: function() {
+        startTime = Date.now();
+        // 从5%开始，慢慢增加
         progressValue = 5;
-        updateProgress(progressValue, '初始化中...');
+        updateProgress(progressValue, '初始化中...', remainingTime);
         
         intervalId = setInterval(() => {
-          // 控制进度增加速度，中间段较慢
-          let increment = 0;
-          if (progressValue < 30) {
-            increment = Math.random() * 2; // 开始阶段快一些
-          } else if (progressValue < 60) {
-            increment = Math.random() * 1; // 中间阶段慢一些
-          } else if (progressValue < 85) {
-            increment = Math.random() * 0.5; // 接近完成时更慢
+          // 计算已用时间和预估剩余时间
+          const elapsedSeconds = (Date.now() - startTime) / 1000;
+          const completionPercentage = progressValue / 100;
+          
+          // 根据当前进度，估计剩余时间
+          // 如果进度为0，避免除以零
+          if (completionPercentage > 0.05) {
+            remainingTime = Math.round((elapsedSeconds / completionPercentage) * (1 - completionPercentage));
+          } else {
+            remainingTime = totalEstimatedTime;
           }
           
+          // 控制进度增加速度，让进度更平滑
+          let increment = 0;
+          
+          // 根据已经过的时间调整增量
+          if (progressValue < 15) {
+            // 前15%很慢，模拟初始化阶段
+            increment = 0.1 + (Math.random() * 0.2);
+          } else if (progressValue < 40) {
+            // 15-40%稍快一些
+            increment = 0.2 + (Math.random() * 0.3);
+          } else if (progressValue < 70) {
+            // 40-70%再稍快一些
+            increment = 0.1 + (Math.random() * 0.2);
+          } else if (progressValue < 85) {
+            // 70-85%变慢，模拟最终处理阶段
+            increment = 0.05 + (Math.random() * 0.1);
+          }
+          
+          // 限制最大进度为85%，等待完成信号
           progressValue = Math.min(progressValue + increment, 85);
-          updateProgress(progressValue, '生成中，请稍候...');
+          
+          // 根据不同进度阶段，显示不同状态消息
+          let statusMessage = '生成中，请稍候...';
+          if (progressValue < 15) {
+            statusMessage = '正在连接服务器，请稍候...';
+          } else if (progressValue < 40) {
+            statusMessage = '正在处理图像，请稍候...';
+          } else if (progressValue < 70) {
+            statusMessage = '正在生成创意内容，请稍候...';
+          } else {
+            statusMessage = '即将完成，最终处理中...';
+          }
+          
+          updateProgress(progressValue, statusMessage, remainingTime);
         }, 800); // 每800毫秒更新一次
+      },
+      
+      update: function(percent) {
+        // 更新进度，但不超过90%，留出完成的空间
+        if (percent > progressValue && percent <= 90) {
+          progressValue = percent;
+          // 计算剩余时间
+          const elapsedSeconds = (Date.now() - startTime) / 1000;
+          const completionPercentage = progressValue / 100;
+          if (completionPercentage > 0) {
+            remainingTime = Math.round((elapsedSeconds / completionPercentage) * (1 - completionPercentage));
+          }
+          updateProgress(progressValue, '接收数据中...', remainingTime);
+        }
       },
       
       complete: function() {
         clearInterval(intervalId);
         progressValue = 100;
-        updateProgress(progressValue, '生成完成！');
+        updateProgress(progressValue, '生成完成！', 0);
       },
       
       reset: function() {
         clearInterval(intervalId);
         progressValue = 0;
-        updateProgress(0, '');
+        updateProgress(0, '', 0);
       }
     };
   }
   
+  // 提示词翻译函数，用于将英文提示词转换为中文
+  function translatePrompt(prompt) {
+    // 针对示例提示词的特定翻译
+    if (prompt.includes("A group of diverse men in casual clothing") && prompt.includes("Studio Ghibli animation")) {
+      return "一群穿着休闲服装的不同男性在户外汽车旁摆姿势，采用温暖柔和的色调和舒适友好的氛围，以吉卜力工作室动画风格呈现。图像应具有手绘、动画效果，柔和的光线、精致的细节和自然的环境。男性应该以温和、富有表现力的特征描绘，穿着现代休闲服装，带有轻松愉快的氛围。";
+    }
+    
+    // 针对预设风格的翻译
+    if (prompt.startsWith("将图片转换成")) {
+      return prompt; // 这些已经是中文，无需翻译
+    }
+    
+    // 如果是其他情况且是英文，返回一个通用提示（因为我们无法进行实时翻译）
+    if (/[a-zA-Z]/.test(prompt) && prompt.length > 30) {
+      return "生成图像的风格提示（原文为英文）";
+    }
+    
+    return prompt; // 默认不翻译
+  }
+
+  // 修改下载图片的函数
+  function setupImageDownload(imageUrl) {
+    // 创建一个临时链接用于下载而非预览
+    downloadImageBtn.onclick = function(e) {
+      e.preventDefault();
+      
+      // 创建一个新图像对象来转换为JPEG格式（如果还不是的话）
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        
+        try {
+          // 转换为JPEG格式
+          canvas.toBlob(function(blob) {
+            // 创建一个下载链接
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'generated-image.jpg';
+            document.body.appendChild(a);
+            a.click();
+            
+            // 清理
+            setTimeout(function() {
+              document.body.removeChild(a);
+              window.URL.revokeObjectURL(url);
+            }, 100);
+          }, 'image/jpeg', 0.9);
+        } catch (err) {
+          console.error('下载图片失败:', err);
+          // 如果转换失败，尝试直接下载原始URL
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = imageUrl;
+          a.download = 'generated-image.jpg';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      };
+      
+      img.onerror = function() {
+        console.error('加载图像失败，尝试直接下载');
+        // 直接尝试下载原始URL
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = imageUrl;
+        a.download = 'generated-image.jpg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+      
+      img.src = imageUrl;
+    };
+    
+    // 预览按钮保持不变
+    previewImageBtn.onclick = function(e) {
+      e.preventDefault();
+      window.open(imageUrl, '_blank');
+    };
+  }
+
   // 处理流式响应
   async function handleStreamResponse(formData) {
     try {
@@ -275,7 +429,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const progress = simulateProgress();
       progress.start();
       
-      updateProgress(20, '建立流式连接...');
+      // 展示加载界面
+      const timeEstimateElement = document.createElement('div');
+      timeEstimateElement.id = 'time-estimate';
+      timeEstimateElement.className = 'time-estimate';
+      loadingIndicator.appendChild(timeEstimateElement);
+      
+      updateProgress(10, '建立流式连接...', 60);
       
       // 创建 EventSource 对象连接服务器发送的事件流
       const formDataForUrl = new URLSearchParams();
@@ -292,10 +452,13 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(errorData.error || '上传文件失败');
       }
       
+      // 获取原始提示词
+      const originalPrompt = promptInput.value.trim();
+      
       // 创建用于显示结果的元素
-      resultContent.style.display = 'block';
-      resultContent.innerHTML = '<div class="streaming-content"></div>';
-      const streamingContent = resultContent.querySelector('.streaming-content');
+      resultContent.style.display = 'none'; // 不显示完整内容
+      const streamingContent = document.createElement('div');
+      streamingContent.className = 'streaming-content';
       
       // 设置流式连接的处理函数
       const reader = uploadResponse.body.getReader();
@@ -304,7 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let originalImagePath = '';
       let generatedImageUrl = '';
       
-      updateProgress(40, '接收数据中...');
+      updateProgress(40, '接收数据中...', 60);
       
       // 处理数据流
       while (true) {
@@ -325,12 +488,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 初始信息
                 originalImagePath = data.content.originalImage;
                 originalImage.src = originalImagePath;
-                updateProgress(50, '正在生成图像...');
+                updateProgress(50, '正在生成图像...', 60);
               } else if (data.type === 'content') {
                 // 流式内容
                 fullContent += data.content;
-                streamingContent.innerHTML = fullContent;
-                updateProgress(60, '接收数据中...');
+                // 不显示内容
               } else if (data.type === 'result') {
                 // 最终结果
                 generatedImageUrl = data.content.generatedImageUrl;
@@ -348,7 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   }
                 }
                 
-                updateProgress(90, '处理生成的图像...');
+                updateProgress(90, '处理生成的图像...', 60);
               }
             } catch (e) {
               console.error('解析数据错误:', e);
@@ -364,11 +526,8 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadImageBtn.href = generatedImageUrl;
         downloadImageBtn.download = 'generated-image.jpg';
         
-        // 设置预览功能
-        previewImageBtn.onclick = function(e) {
-          e.preventDefault();
-          window.open(generatedImageUrl, '_blank');
-        };
+        // 设置下载和预览功能
+        setupImageDownload(generatedImageUrl);
         
         // 显示图像容器
         generatedImageContainer.style.display = 'block';
@@ -407,7 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 显示加载状态
     uploadForm.parentElement.hidden = true;
     loadingIndicator.style.display = 'flex';
-    updateProgress(5, '准备上传文件...');
+    updateProgress(5, '准备上传文件...', 60);
 
     // 获取用户提示词
     const prompt = promptInput.value.trim() || '将图片转换成创意风格';
@@ -451,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // 非流式响应处理（原有方式）
-      updateProgress(20, '上传图片中...');
+      updateProgress(20, '上传图片中...', 60);
 
       // 发送请求到服务器
       const response = await fetch('/api/generate-image', {
@@ -459,13 +618,13 @@ document.addEventListener('DOMContentLoaded', () => {
         body: formData
       });
 
-      updateProgress(50, '图片已上传，正在生成中...');
+      updateProgress(50, '图片已上传，正在生成中...', 60);
 
       const data = await response.json();
 
       if (data.success) {
         // 进度跳跃到90%
-        updateProgress(90, '生成成功，处理结果中...');
+        updateProgress(90, '生成成功，处理结果中...', 0);
         
         // 更新用户积分（从响应中获取或重新获取用户信息）
         if (data.updatedCredits !== undefined) {
@@ -487,14 +646,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // Display results
         originalImage.src = data.originalImage;
         
+        // 显示原始提示词
+        const originalPromptDisplay = document.getElementById('original-prompt-display');
+        if (originalPromptDisplay) {
+          originalPromptDisplay.textContent = prompt;
+        }
+        
         // 清空之前的内容
-        resultContent.innerHTML = '';
+        resultContent.style.display = 'none';
         
         if (data.result) {
           // 处理结果，检查是否包含图像 URL
           const result = data.result;
-          // 不显示文字内容，只保留图像
-          resultContent.innerHTML = ''; // 清空文字内容
           
           // 检查是否包含速率限制或其他错误信息
           if (result.includes('rate limit') || result.includes('I can\'t create') || result.includes('can\'t generate')) {
@@ -532,31 +695,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 downloadImageBtn.href = jpegUrl;
                 downloadImageBtn.download = 'generated-image.jpg'; // 设置下载文件名
                 
-                // 正确设置预览功能，新标签页打开
-                previewImageBtn.onclick = function(e) {
-                  e.preventDefault(); // 防止默认行为
-                  window.open(jpegUrl, '_blank');
-                };
+                // 设置下载和预览功能
+                setupImageDownload(jpegUrl);
+                
+                // 显示图像容器
+                generatedImageContainer.style.display = 'block';
               } catch (err) {
-                // console.error('转换图像格式失败:', err);
                 // 如果转换失败，回退到原始 URL
                 generatedImage.src = imageUrl;
-                downloadImageBtn.href = imageUrl;
-                previewImageBtn.onclick = function(e) {
-                  e.preventDefault();
-                  window.open(imageUrl, '_blank');
-                };
+                
+                // 设置下载和预览功能
+                setupImageDownload(imageUrl);
+                
+                // 显示图像容器
+                generatedImageContainer.style.display = 'block';
               }
-              
-              // 显示图像容器
-              generatedImageContainer.style.display = 'block';
             };
             
             img.onerror = function() {
               // console.error('加载图像失败');
               // 加载失败时使用原始 URL
               generatedImage.src = imageUrl;
-              downloadImageBtn.href = imageUrl;
+              
+              // 设置下载和预览功能
+              setupImageDownload(imageUrl);
+              
+              // 显示图像容器
               generatedImageContainer.style.display = 'block';
             };
             
