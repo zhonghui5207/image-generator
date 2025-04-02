@@ -7,8 +7,44 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="auth.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f7f9fc;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .back-to-home {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: var(--primary-color);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .back-to-home i {
+            margin-right: 5px;
+        }
+        
+        .back-to-home:hover {
+            transform: translateX(-3px);
+        }
+    </style>
 </head>
 <body>
+    
+    <a href="index.html" class="back-to-home">
+        <i class="fas fa-arrow-left"></i> 返回首页
+    </a>
+    
     <div class="auth-container">
         <div class="auth-card">
             <div class="auth-header">
@@ -39,5 +75,6 @@
     </div>
     
     <script src="auth.js"></script>
+    <script src="auth-ui.js"></script>
 </body>
 </html>

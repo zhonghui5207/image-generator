@@ -70,7 +70,14 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       `;
       
+      // 显示模态框
       paymentModal.style.display = 'block';
+      
+      // 添加模态框动画效果
+      setTimeout(() => {
+        document.querySelector('.modal-content').style.opacity = '1';
+        document.querySelector('.modal-content').style.transform = 'translateY(0)';
+      }, 10);
     });
   }
   
@@ -167,8 +174,16 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 获取交易历史
   async function fetchTransactionHistory() {
+    // 获取DOM元素
+    const purchaseList = document.getElementById('purchase-list');
+    if (!purchaseList) return;
+    
     try {
-      const response = await fetch('/api/credits/transactions', {
+      // 显示加载中状态
+      purchaseList.innerHTML = '<p class="loading-message"><i class="fas fa-spinner fa-spin"></i> 正在加载购买记录...</p>';
+      
+      // 尝试获取交易记录
+      const response = await fetch('/api/credits/purchases', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -178,37 +193,49 @@ document.addEventListener('DOMContentLoaded', function() {
       if (response.ok) {
         const data = await response.json();
         
-        if (data.transactions && data.transactions.length > 0) {
-          // 清空现有内容
-          transactionList.innerHTML = '';
-          
-          // 添加交易记录
-          data.transactions.forEach(transaction => {
-            const date = new Date(transaction.createdAt).toLocaleString();
-            const transactionItem = document.createElement('div');
-            transactionItem.className = 'transaction-item';
-            
-            // 判断交易类型（增加或减少）
-            const isCredit = transaction.amount > 0;
-            const amountClass = isCredit ? 'credit-amount' : 'debit-amount';
-            
-            transactionItem.innerHTML = `
-              <div class="transaction-date">${date}</div>
-              <div class="transaction-description">${transaction.description}</div>
-              <div class="transaction-amount ${amountClass}">
-                ${isCredit ? '+' : ''}${transaction.amount} 积分
-              </div>
-            `;
-            
-            transactionList.appendChild(transactionItem);
-          });
+        // 处理数据
+        if (data.purchases && data.purchases.length > 0) {
+          displayPurchaseRecords(data.purchases);
         } else {
-          transactionList.innerHTML = '<p class="empty-list">暂无交易记录</p>';
+          // 没有记录
+          purchaseList.innerHTML = '<p class="empty-list">暂无购买记录</p>';
         }
+      } else {
+        // API调用失败
+        purchaseList.innerHTML = '<p class="empty-list">暂无购买记录</p>';
       }
     } catch (error) {
-      console.error('获取交易历史失败:', error);
-      transactionList.innerHTML = '<p class="empty-list">加载交易记录失败</p>';
+      console.error('获取购买记录失败:', error);
+      purchaseList.innerHTML = '<p class="empty-list">暂无购买记录</p>';
+    }
+  }
+  
+  // 显示购买记录
+  function displayPurchaseRecords(records) {
+    const purchaseList = document.getElementById('purchase-list');
+    if (!purchaseList) return;
+    
+    if (records && records.length > 0) {
+      // 清空现有内容
+      purchaseList.innerHTML = '';
+      
+      // 添加购买记录
+      records.forEach(record => {
+        const date = new Date(record.createdAt).toLocaleString();
+        const item = document.createElement('div');
+        item.className = 'transaction-item';
+        
+        item.innerHTML = `
+          <div class="transaction-date">${date}</div>
+          <div class="transaction-details">${record.description || '购买积分'}</div>
+          <div class="transaction-amount positive">+${record.amount} 积分</div>
+        `;
+        
+        purchaseList.appendChild(item);
+      });
+    } else {
+      // 显示没有购买记录的提示
+      purchaseList.innerHTML = '<p class="empty-list">暂无购买记录</p>';
     }
   }
   

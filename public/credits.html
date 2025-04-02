@@ -6,6 +6,8 @@
     <title>购买积分 - AI 图像生成器</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="auth.css">
+    <link rel="stylesheet" href="nav-styles.css">
+    <link rel="stylesheet" href="credits.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -23,47 +25,69 @@
         </header>
 
         <main>
-            <div class="credits-container">
-                <h2>我的积分</h2>
-                <div class="credits-balance">
-                    <div>
-                        <div class="credits-amount" id="credits-amount">0</div>
-                        <div class="credits-label">当前积分余额</div>
+            <div class="credits-page">
+                <div class="credits-section">
+                    <div class="credits-container">
+                        <h2 class="section-title">我的积分</h2>
+                        <div class="credits-balance">
+                            <div class="balance-display">
+                                <div class="credits-amount" id="credits-amount">0</div>
+                                <div class="credits-label">当前积分余额</div>
+                            </div>
+                            <div class="credits-info">
+                                <p><i class="fas fa-info-circle"></i> 每次生成图像消耗 1 积分</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <p>每次生成图像消耗 1 积分</p>
+                
+                    <div class="purchase-container">
+                        <h2 class="section-title">购买积分套餐</h2>
+                        <div class="credits-packages">
+                            <div class="credit-package" data-package="basic">
+                                <div class="package-header">
+                                    <h3>基础套餐</h3>
+                                    <span class="package-tag">轻度使用</span>
+                                </div>
+                                <div class="package-content">
+                                    <div class="package-credits">10 积分</div>
+                                    <div class="package-price">¥9.99</div>
+                                    <p class="package-desc">适合尝试和轻度使用</p>
+                                </div>
+                            </div>
+                            <div class="credit-package" data-package="standard">
+                                <div class="package-header">
+                                    <h3>标准套餐</h3>
+                                    <span class="package-tag popular">最受欢迎</span>
+                                </div>
+                                <div class="package-content">
+                                    <div class="package-credits">50 积分</div>
+                                    <div class="package-price">¥39.99</div>
+                                    <p class="package-desc">最受欢迎的选择</p>
+                                </div>
+                            </div>
+                            <div class="credit-package" data-package="premium">
+                                <div class="package-header">
+                                    <h3>高级套餐</h3>
+                                    <span class="package-tag best-value">最佳性价比</span>
+                                </div>
+                                <div class="package-content">
+                                    <div class="package-credits">120 积分</div>
+                                    <div class="package-price">¥79.99</div>
+                                    <p class="package-desc">为重度用户提供最佳性价比</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="buy-credits-btn" class="buy-credits-btn" disabled>请选择套餐</button>
                     </div>
                 </div>
-
-                <h2>购买积分套餐</h2>
-                <div class="credits-packages">
-                    <div class="credit-package" data-package="basic">
-                        <h3>基础套餐</h3>
-                        <div class="package-credits">10 积分</div>
-                        <div class="package-price">¥9.99</div>
-                        <p>适合轻度使用</p>
+                
+                <div class="history-section">
+                    <div class="transaction-history">
+                        <h2 class="section-title">积分购买记录</h2>
+                        <div class="transaction-list" id="purchase-list">
+                            <p class="empty-list">暂无购买记录</p>
+                        </div>
                     </div>
-                    <div class="credit-package" data-package="standard">
-                        <h3>标准套餐</h3>
-                        <div class="package-credits">50 积分</div>
-                        <div class="package-price">¥39.99</div>
-                        <p>最受欢迎的选择</p>
-                    </div>
-                    <div class="credit-package" data-package="premium">
-                        <h3>高级套餐</h3>
-                        <div class="package-credits">120 积分</div>
-                        <div class="package-price">¥79.99</div>
-                        <p>最佳性价比</p>
-                    </div>
-                </div>
-
-                <button id="buy-credits-btn" class="buy-credits-btn" disabled>请选择套餐</button>
-            </div>
-
-            <div class="transaction-history">
-                <h2>交易记录</h2>
-                <div class="transaction-list" id="transaction-list">
-                    <p class="empty-list">暂无交易记录</p>
                 </div>
             </div>
         </main>
@@ -83,18 +107,19 @@
                 <div class="payment-methods">
                     <label>
                         <input type="radio" name="payment-method" value="alipay" checked>
-                        <span>支付宝</span>
+                        <span><i class="fas fa-alipay"></i> 支付宝</span>
                     </label>
                     <label>
                         <input type="radio" name="payment-method" value="wechat">
-                        <span>微信支付</span>
+                        <span><i class="fab fa-weixin"></i> 微信支付</span>
                     </label>
                 </div>
             </div>
-            <button id="confirm-payment-btn" class="auth-btn">确认支付</button>
+            <button id="confirm-payment-btn">确认支付</button>
         </div>
     </div>
 
     <script src="credits.js"></script>
+    <script src="auth-ui.js"></script>
 </body>
 </html>

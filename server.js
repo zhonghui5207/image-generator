@@ -143,6 +143,9 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
       
       // 不再使用单独的连接测试，因为它可能导致额外的错误
       
+      // 将原始图像保存到公共目录
+      const originalImagePath = `/uploads/${path.basename(imagePath)}`;
+      
       // 使用 OpenAI 的 chat completions API
       console.log("Sending request to OpenAI API...");
       const response = await openai.chat.completions.create({
@@ -165,6 +168,14 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         timeout: 300000  // 增加到 5 分钟超时
       });
 
+        console.log("Chat API response received");
+        console.log("Response structure:", JSON.stringify(Object.keys(response)));
+        if (response.choices && response.choices.length > 0) {
+          console.log("First choice:", JSON.stringify(response.choices[0]));
+        } else {
+          console.log("No choices in response");
+        }
+        
       console.log("Response received from OpenAI API");
       console.log("Response structure:", JSON.stringify(Object.keys(response)));
       if (response.choices && response.choices.length > 0) {
@@ -173,17 +184,45 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         console.log("No choices in response");
       }
 
-      // 保存生成的图像记录
-      const originalImagePath = `/uploads/${path.basename(imagePath)}`;
-      
-      // 尝试提取生成的图像URL
-      const result = response.choices[0].message.content;
-      const imgUrlMatch = result.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/i) || 
-                          result.match(/\bhttps?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp)\b/i);
-      
+      // 从响应中提取图像 URL
       let generatedImageUrl = '';
-      if (imgUrlMatch && imgUrlMatch[1]) {
-        generatedImageUrl = imgUrlMatch[1];
+      
+      if (response.choices && response.choices.length > 0) {
+        const result = response.choices[0].message.content;
+        console.log('处理图像 URL 提取，原始结果:', result);
+        
+        // 尝试匹配图像 URL
+        // 1. 先尝试匹配 Markdown 格式的图像链接
+        let imgUrlMatch = result.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/i);
+        
+        // 2. 如果没有找到，尝试匹配下载链接
+        if (!imgUrlMatch) {
+          imgUrlMatch = result.match(/\[\u4e0b\u8f7d[^\]]*\]\((https?:\/\/[^\s)]+)\)/i);
+        }
+        
+        // 3. 如果还是没有找到，尝试匹配 OpenAI 特有的 oaiusercontent 链接
+        if (!imgUrlMatch) {
+          imgUrlMatch = result.match(/(https?:\/\/oaiusercontent[^\s"'<>]+)/i);
+        }
+        
+        console.log('图像 URL 匹配结果:', imgUrlMatch);
+        
+        // 从匹配结果中提取 URL
+        if (imgUrlMatch && imgUrlMatch[1]) {
+          // 如果有捕获组，使用第一个捕获组
+          generatedImageUrl = imgUrlMatch[1];
+        } else if (imgUrlMatch && imgUrlMatch[0] && imgUrlMatch[0].startsWith('http')) {
+          // 如果没有捕获组，但整个匹配是 URL
+          generatedImageUrl = imgUrlMatch[0];
+        }
+        
+        console.log('提取的图像 URL:', generatedImageUrl);
+      }
+      
+      // 如果没有找到图像 URL，使用原始图像作为占位
+      if (!generatedImageUrl) {
+        console.log('未找到图像 URL，使用原始图像作为占位');
+        generatedImageUrl = originalImagePath;
       }
       
       // 创建历史记录

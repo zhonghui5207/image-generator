@@ -1,0 +1,430 @@
+/* 积分页面样式 */
+.credits-page {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.credits-section {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+@media (min-width: 992px) {
+  .credits-section {
+    flex-direction: row;
+  }
+  
+  .credits-container,
+  .purchase-container {
+    flex: 1;
+  }
+}
+
+.section-title {
+  color: var(--primary-color);
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+/* 积分余额样式 */
+.credits-container {
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: 25px;
+  box-shadow: var(--box-shadow);
+}
+
+.credits-balance {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: var(--border-radius);
+}
+
+.balance-display {
+  text-align: center;
+}
+
+.credits-amount {
+  font-size: 3rem;
+  font-weight: bold;
+  color: var(--primary-color);
+  margin-bottom: 5px;
+}
+
+.credits-label {
+  color: var(--secondary-color);
+  font-size: 0.9rem;
+}
+
+.credits-info {
+  width: 100%;
+  text-align: center;
+  color: var(--secondary-color);
+}
+
+.credits-info p {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* 套餐选择样式 */
+.purchase-container {
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: 25px;
+  box-shadow: var(--box-shadow);
+}
+
+.credits-packages {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-bottom: 25px;
+}
+
+@media (min-width: 768px) {
+  .credits-packages {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.credit-package {
+  border: 2px solid #e9ecef;
+  border-radius: var(--border-radius);
+  padding: 0;
+  cursor: pointer;
+  transition: var(--transition);
+  overflow: hidden;
+}
+
+.credit-package:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+.credit-package.selected {
+  border-color: var(--primary-color);
+  background-color: rgba(74, 107, 223, 0.05);
+}
+
+.package-header {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-bottom: 1px solid #e9ecef;
+  position: relative;
+}
+
+.package-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.package-tag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  background-color: #e9ecef;
+  color: #495057;
+  border-radius: 0 0 0 8px;
+}
+
+.package-tag.popular {
+  background-color: #4a6bdf;
+  color: white;
+}
+
+.package-tag.best-value {
+  background-color: #28a745;
+  color: white;
+}
+
+.package-content {
+  padding: 20px;
+  text-align: center;
+}
+
+.package-credits {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.package-price {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+  font-weight: 600;
+  margin-bottom: 15px;
+}
+
+.package-desc {
+  color: var(--secondary-color);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.buy-credits-btn {
+  width: 100%;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 15px;
+  border-radius: var(--border-radius);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.buy-credits-btn:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+}
+
+.buy-credits-btn:disabled {
+  background-color: var(--secondary-color);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* 交易记录样式 */
+.history-section {
+  width: 100%;
+}
+
+.transaction-history {
+  background-color: white;
+  border-radius: var(--border-radius);
+  padding: 25px;
+  box-shadow: var(--box-shadow);
+}
+
+.transaction-list {
+  border: 1px solid #e9ecef;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.transaction-item {
+  padding: 15px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.transaction-item:last-child {
+  border-bottom: none;
+}
+
+.transaction-date {
+  font-size: 0.9rem;
+  color: var(--secondary-color);
+  flex: 1;
+  min-width: 200px;
+}
+
+.transaction-details {
+  flex: 2;
+  min-width: 200px;
+}
+
+.transaction-amount {
+  font-weight: bold;
+  flex: 1;
+  text-align: right;
+  min-width: 100px;
+}
+
+.transaction-amount.positive {
+  color: var(--success-color);
+}
+
+.transaction-amount.negative {
+  color: var(--danger-color);
+}
+
+.empty-list {
+  padding: 30px;
+  text-align: center;
+  color: var(--secondary-color);
+}
+
+/* 支付模态框样式 */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  overflow: auto;
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  position: relative;
+  background-color: white;
+  margin: 50px auto;
+  max-width: 500px;
+  width: 90%;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  padding: 30px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.close-modal {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  font-size: 24px;
+  color: #aaa;
+  cursor: pointer;
+  transition: color 0.2s;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.close-modal:hover {
+  color: var(--primary-color);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.modal h2 {
+  color: #333;
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+  text-align: center;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+#package-details {
+  background-color: #f8f9fa;
+  padding: 20px;
+  border-radius: 10px;
+  margin: 20px 0;
+  text-align: center;
+  border: 1px solid #e9ecef;
+}
+
+.package-summary h3 {
+  color: #333;
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.2rem;
+}
+
+.package-summary .package-credits {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--primary-color);
+  margin-bottom: 5px;
+}
+
+.package-summary .package-price {
+  font-size: 1.3rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.payment-options {
+  margin: 25px 0;
+}
+
+.payment-options h3 {
+  color: #333;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.payment-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.payment-methods label {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.payment-methods label:hover {
+  background-color: #f8f9fa;
+  border-color: #ddd;
+}
+
+.payment-methods input[type="radio"] {
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary-color);
+}
+
+.payment-methods input[type="radio"]:checked + span {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.payment-methods label:has(input[type="radio"]:checked) {
+  border-color: var(--primary-color);
+  background-color: rgba(74, 107, 223, 0.05);
+}
+
+#confirm-payment-btn {
+  width: 100%;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 15px;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+#confirm-payment-btn:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(74, 107, 223, 0.3);
+}

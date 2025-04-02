@@ -59,16 +59,14 @@ router.get('/:id', authenticate, async (req, res) => {
 // 删除图像历史记录
 router.delete('/:id', authenticate, async (req, res) => {
   try {
-    const image = await GeneratedImage.findOne({
+    const result = await GeneratedImage.findOneAndDelete({
       _id: req.params.id,
       user: req.user._id
     });
     
-    if (!image) {
+    if (!result) {
       return res.status(404).json({ success: false, message: '图像不存在' });
     }
-    
-    await image.remove();
     
     res.json({
       success: true,

@@ -6,7 +6,9 @@
     <title>个人中心 - AI 图像生成器</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="auth.css">
+    <link rel="stylesheet" href="nav-styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="profile.css">
 </head>
 <body>
     <div class="container">
@@ -25,6 +27,21 @@
         <main>
             <div class="profile-container">
                 <div class="profile-header">
+                    <div class="user-avatar-section">
+                        <div class="avatar-container">
+                            <img id="user-avatar" src="/images/default-avatar.png" alt="用户头像">
+                            <div class="avatar-edit">
+                                <label for="avatar-upload">
+                                    <i class="fas fa-camera"></i>
+                                </label>
+                                <input type="file" id="avatar-upload" accept="image/*" style="display: none;">
+                            </div>
+                        </div>
+                        <div class="user-name-display">
+                            <h2 id="display-username"></h2>
+                            <span class="user-status">普通用户</span>
+                        </div>
+                    </div>
                     <div class="user-info">
                         <h2>个人信息</h2>
                         <div class="user-details">
@@ -32,6 +49,7 @@
                             <p><strong>邮箱:</strong> <span id="email"></span></p>
                             <p><strong>积分余额:</strong> <span id="credits"></span></p>
                             <p><strong>注册时间:</strong> <span id="created-at"></span></p>
+                            <p><strong>生成次数:</strong> <span id="generation-count">0</span></p>
                         </div>
                     </div>
                     <div class="credits-summary">
@@ -40,23 +58,56 @@
                         <a href="credits.html" class="buy-credits-link">购买积分</a>
                     </div>
                 </div>
+                
+                <div class="profile-tabs">
+                    <button class="tab-btn active" data-tab="history">生成历史</button>
+                    <button class="tab-btn" data-tab="credits">积分记录</button>
+                </div>
 
-                <div class="history-container">
-                    <h2>生成历史</h2>
-                    <div class="history-filters">
-                        <select id="history-sort">
-                            <option value="newest">最新优先</option>
-                            <option value="oldest">最早优先</option>
-                        </select>
-                    </div>
-                    <div class="history-grid" id="history-grid">
-                        <!-- 历史记录将通过JavaScript动态加载 -->
-                        <div class="empty-history">暂无生成历史</div>
-                    </div>
-                    <div class="pagination" id="pagination">
-                        <!-- 分页控件将通过JavaScript动态加载 -->
+                <div class="tab-content active" id="history-tab">
+                    <div class="history-container">
+                        <h2>生成历史</h2>
+                        <div class="history-filters">
+                            <div class="filter-group">
+                                <label for="history-sort">排序方式:</label>
+                                <select id="history-sort">
+                                    <option value="newest">最新优先</option>
+                                    <option value="oldest">最早优先</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="history-filter">筛选条件:</label>
+                                <select id="history-filter">
+                                    <option value="all">全部图像</option>
+                                    <option value="this-week">本周生成</option>
+                                    <option value="this-month">本月生成</option>
+                                </select>
+                            </div>
+                            <div class="search-group">
+                                <input type="text" id="prompt-search" placeholder="搜索提示词...">
+                                <button id="search-btn"><i class="fas fa-search"></i></button>
+                            </div>
+                        </div>
+                        <div class="history-grid" id="history-grid">
+                            <!-- 历史记录将通过JavaScript动态加载 -->
+                            <div class="empty-history">暂无生成历史</div>
+                        </div>
+                        <div class="pagination" id="pagination">
+                            <!-- 分页控件将通过JavaScript动态加载 -->
+                        </div>
                     </div>
                 </div>
+                
+                <div class="tab-content" id="credits-tab">
+                    <div class="credits-history-container">
+                        <h2>积分使用记录</h2>
+                        <div class="transaction-list" id="usage-list">
+                            <p class="empty-list">暂无使用记录</p>
+                        </div>
+                    </div>
+                </div>
+                
+
             </div>
         </main>
 
@@ -85,19 +136,41 @@
                     <p><strong>提示词:</strong> <span id="modal-prompt"></span></p>
                     <p><strong>生成时间:</strong> <span id="modal-created-at"></span></p>
                     <p><strong>消耗积分:</strong> <span id="modal-credits-used"></span></p>
+                    <p><strong>使用模型:</strong> <span id="modal-model-used"></span></p>
                 </div>
                 <div class="image-actions">
-                    <a id="modal-download-btn" href="#" download class="download-btn">
-                        <i class="fas fa-download"></i> 下载图像
-                    </a>
-                    <button id="modal-regenerate-btn" class="regenerate-btn">
-                        <i class="fas fa-sync-alt"></i> 重新生成
+                    <div class="download-options">
+                        <a id="modal-download-jpg-btn" href="#" download="generated-image.jpg" class="download-btn">
+                            <i class="fas fa-download"></i> 下载 JPEG
+                        </a>
+                        <a id="modal-download-png-btn" href="#" download="generated-image.png" class="download-btn">
+                            <i class="fas fa-download"></i> 下载 PNG
+                        </a>
+                    </div>
+                    <button id="modal-delete-btn" class="delete-btn">
+                        <i class="fas fa-trash"></i> 删除
                     </button>
                 </div>
             </div>
         </div>
     </div>
+    
+    <!-- 确认删除模态框 -->
+    <div id="delete-confirm-modal" class="modal">
+        <div class="modal-content confirm-modal-content">
+            <span class="close-modal" id="close-delete-modal">&times;</span>
+            <h2>确认删除</h2>
+            <p>您确定要删除这张图像吗？此操作无法撤销。</p>
+            <div class="confirm-actions">
+                <button id="confirm-delete-btn" class="btn danger-btn">确认删除</button>
+                <button id="cancel-delete-btn" class="btn secondary-btn">取消</button>
+            </div>
+        </div>
+    </div>
+    
 
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="profile.js"></script>
 </body>
 </html>

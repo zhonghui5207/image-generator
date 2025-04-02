@@ -1,0 +1,58 @@
+/* 导航栏样式 */
+.main-nav {
+  margin-top: 20px;
+  padding: 10px 0;
+}
+
+.main-nav ul {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 15px;
+  padding: 0;
+  margin: 0;
+}
+
+.main-nav li {
+  margin: 0;
+  padding: 0;
+}
+
+.main-nav a {
+  text-decoration: none;
+  color: var(--secondary-color);
+  font-weight: 500;
+  padding: 8px 15px;
+  border-radius: 20px;
+  transition: var(--transition);
+}
+
+.main-nav a:hover {
+  color: var(--primary-color);
+  background-color: rgba(74, 107, 223, 0.1);
+}
+
+.main-nav a.active {
+  color: var(--primary-color);
+  background-color: rgba(74, 107, 223, 0.1);
+  font-weight: 600;
+}
+
+/* 响应式导航栏 */
+@media (max-width: 768px) {
+  .main-nav ul {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .main-nav li {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .main-nav a {
+    display: block;
+    padding: 10px;
+  }
+}

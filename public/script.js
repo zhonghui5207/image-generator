@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.reload();
       }
     } catch (error) {
-      console.error('获取用户信息失败:', error);
+      // console.error('获取用户信息失败:', error);
     }
   }
 
@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const inputEvent = new Event('input', { bubbles: true });
       promptInput.dispatchEvent(inputEvent);
       
-      console.log('Preset button clicked, prompt set to:', prompt);
+      // console.log('Preset button clicked, prompt set to:', prompt);
     });
   });
 
@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
       generateBtn.classList.remove('active');
     }
     
-    console.log('Form validity checked:', isValid, 'selectedFile:', !!selectedFile, 'promptInput:', !!promptInput.value.trim());
+    // console.log('Form validity checked:', isValid, 'selectedFile:', !!selectedFile, 'promptInput:', !!promptInput.value.trim());
   }
 
   // Prompt input event
@@ -201,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
       dropArea.querySelector('.upload-content').style.display = 'none';
       // 确保在图片加载后检查表单有效性
       setTimeout(checkFormValidity, 100); // 添加小延迟确保 DOM 更新
-      console.log('Image loaded, checking form validity');
+      // console.log('Image loaded, checking form validity');
     };
     
     reader.readAsDataURL(file);
@@ -396,7 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   window.open(jpegUrl, '_blank');
                 };
               } catch (err) {
-                console.error('转换图像格式失败:', err);
+                // console.error('转换图像格式失败:', err);
                 // 如果转换失败，回退到原始 URL
                 generatedImage.src = imageUrl;
                 downloadImageBtn.href = imageUrl;
@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             
             img.onerror = function() {
-              console.error('加载图像失败');
+              // console.error('加载图像失败');
               // 加载失败时使用原始 URL
               generatedImage.src = imageUrl;
               downloadImageBtn.href = imageUrl;
@@ -443,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(data.error || '生成失败');
       }
     } catch (error) {
-      console.error('错误详情:', error);
+      // console.error('错误详情:', error);
       
       // 重置进度条
       progress.reset();
@@ -467,7 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 增强版错误处理函数
   function showError(message) {
-    console.error('错误:', message);
+    // console.error('错误:', message);
     
     // 重置进度条（如果存在）
     if (typeof progress !== 'undefined' && progress && typeof progress.reset === 'function') {
