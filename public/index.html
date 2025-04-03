@@ -27,7 +27,7 @@
     <div class="container">
         <header>
             <h1><span class="icon-wrapper"><i class="fas fa-magic"></i><span class="icon-fallback"></span></span> AI 图像生成器</h1>
-            <p>上传图片并添加提示词，使用 GPT-4o 生成创意图像</p>
+            <p>使用 GPT-4o 生成创意图像，支持图生图和文生图两种模式</p>
             <nav class="main-nav">
                 <ul>
                     <li><a href="index.html" class="active">首页</a></li>
@@ -62,9 +62,20 @@
                 </div>
             </div>
 
+            <div class="generation-modes">
+                <div class="mode-tabs">
+                    <button type="button" class="mode-tab active" id="image-to-image-tab">
+                        <span class="icon-wrapper"><i class="fas fa-image"></i><span class="icon-fallback"></span></span> 图生图模式
+                    </button>
+                    <button type="button" class="mode-tab" id="text-to-image-tab">
+                        <span class="icon-wrapper"><i class="fas fa-font"></i><span class="icon-fallback"></span></span> 文生图模式
+                    </button>
+                </div>
+            </div>
+
             <div class="upload-container">
                 <form id="upload-form">
-                    <div class="file-upload">
+                    <div class="file-upload" id="image-to-image-mode">
                         <div class="file-upload-area" id="drop-area">
                             <input type="file" id="file-input" accept="image/*" hidden>
                             <div class="upload-content">
@@ -80,10 +91,19 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="text-to-image-mode" id="text-to-image-mode" style="display: none;">
+                        <div class="text-to-image-info">
+                            <div class="mode-description">
+                                <span class="icon-wrapper"><i class="fas fa-info-circle"></i><span class="icon-fallback"></span></span>
+                                <p>在下方输入详细的提示词描述，AI 将直接生成符合描述的图像</p>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="prompt-container">
                         <label for="prompt">提示词:</label>
-                        <textarea id="prompt" name="prompt" placeholder="描述你想要的图像风格，例如：'将图片转换成文艺复兴时期的油画风格'"></textarea>
+                        <textarea id="prompt" name="prompt" placeholder="描述你想要的图像内容和风格" data-image-placeholder="描述你想要的图像风格，例如：'将图片转换成文艺复兴时期的油画风格'" data-text-placeholder="详细描述你想要生成的图像内容、场景、风格等，例如：'一只金色的猫咪站在山顶，背景是日落，写实风格'"></textarea>
                     </div>
 
                     <div class="model-selector">
@@ -112,7 +132,7 @@
                         </div>
                     </div>
 
-                    <div class="style-presets">
+                    <div class="style-presets" id="image-style-presets">
                         <h3>风格预设:</h3>
                         <div class="preset-buttons">
                             <button type="button" class="preset-btn" data-prompt="将图片转换成文艺复兴时期的油画风格">文艺复兴</button>
@@ -129,35 +149,65 @@
                             <button type="button" class="preset-btn" data-prompt="将图片转换成蒸汽波美学风格">蒸汽波</button>
                         </div>
                     </div>
+                    
+                    <div class="style-presets" id="text-style-presets" style="display: none;">
+                        <h3>内容预设:</h3>
+                        <div class="preset-buttons">
+                            <button type="button" class="preset-btn" data-prompt="一只金色的猫咪站在山顶，背景是日落，写实风格">猫咪日落</button>
+                            <button type="button" class="preset-btn" data-prompt="未来城市的天际线，霓虹灯光，赛博朋克风格">未来城市</button>
+                            <button type="button" class="preset-btn" data-prompt="宁静的湖泊，周围是秋天的森林，印象派风格">秋季湖泊</button>
+                            <button type="button" class="preset-btn" data-prompt="古代中国宫殿，雪景，水墨画风格">古代宫殿</button>
+                            <button type="button" class="preset-btn" data-prompt="幻想世界的飞行岛屿，悬浮在云层中，魔幻现实主义风格">飞行岛屿</button>
+                            <button type="button" class="preset-btn" data-prompt="深海世界，五彩斑斓的珊瑚和鱼群，超现实主义风格">深海世界</button>
+                            <button type="button" class="preset-btn" data-prompt="宇航员站在外星球表面，远处有两个月亮，科幻风格">外星探索</button>
+                            <button type="button" class="preset-btn" data-prompt="繁华的夜市街道，传统亚洲风格，人群和小吃摊">夜市街道</button>
+                            <button type="button" class="preset-btn" data-prompt="童话森林中的小木屋，阳光透过树叶，吉卜力风格">童话小屋</button>
+                            <button type="button" class="preset-btn" data-prompt="沙漠中的绿洲，骆驼商队，黄昏时分，油画风格">沙漠绿洲</button>
+                            <button type="button" class="preset-btn" data-prompt="雨后的城市街道，反射着霓虹灯光，电影感风格">雨后街道</button>
+                            <button type="button" class="preset-btn" data-prompt="冰雪城堡，北极光在天空中舞动，梦幻风格">冰雪城堡</button>
+                        </div>
+                    </div>
 
                     <button type="submit" id="generate-btn" class="generate-btn" disabled>
-                        <span class="icon-wrapper"><i class="fas fa-wand-magic-sparkles"></i><span class="icon-fallback"></span></span> 生成图像
+                        <span class="icon-wrapper"><i class="fas fa-wand-magic-sparkles"></i><span class="icon-fallback"></span></span> <span id="generate-btn-text">生成图像</span>
                     </button>
                 </form>
             </div>
 
             <div class="result-container" id="result-container" hidden>
                 <h2>生成结果</h2>
-                <div class="comparison">
-                    <div class="image-box">
-                        <h3>原始图像</h3>
-                        <img id="original-image" src="#" alt="原始图像">
-                    </div>
-                    <div class="image-box">
-                        <h3>生成结果</h3>
-                        <!-- 隐藏文字内容，只在需要时显示 -->
-                        <div id="result-content" style="display: none;"></div>
-                        <div id="generated-image-container" class="generated-image-container">
-                            <img id="generated-image" src="#" alt="生成的图像">
-                            <div class="image-actions">
-                                <a id="download-image" href="#" download="generated-image.jpg" class="download-btn">
-                                    <span class="icon-wrapper"><i class="fas fa-download"></i><span class="icon-fallback"></span></span> 下载
-                                </a>
-                                <button id="preview-image-btn" class="preview-btn">
-                                    <span class="icon-wrapper"><i class="fas fa-eye"></i><span class="icon-fallback"></span></span> 预览
-                                </button>
-                            </div>
+                <div class="result-layout">
+                    <div class="comparison" id="comparison-container">
+                        <div class="image-box" id="original-image-box">
+                            <h3>原始图像</h3>
+                            <img id="original-image" src="#" alt="原始图像">
                         </div>
+                        <div class="image-box">
+                            <!-- 移除重复的标题 -->
+                            <div id="generated-image-container" class="generated-image-container">
+                                <img id="generated-image" src="#" alt="生成的图像">
+                                <div class="image-actions">
+                                    <a id="download-image" href="#" download="generated-image.jpg" class="download-btn">
+                                        <span class="icon-wrapper"><i class="fas fa-download"></i><span class="icon-fallback"></span></span> 下载
+                                    </a>
+                                    <button id="preview-image-btn" class="preview-btn">
+                                        <span class="icon-wrapper"><i class="fas fa-eye"></i><span class="icon-fallback"></span></span> 预览
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- 隐藏文字内容，只在需要时显示 -->
+                            <div id="result-content" style="display: none;"></div>
+                        </div>
+                    </div>
+                    
+                </div>
+                
+                <!-- 新增提示词显示区域（移到结果布局外部，避免嵌套） -->
+                <div class="prompt-display" id="prompt-display">
+                    <h3>提示词详情</h3>
+                    <div class="prompt-content">
+                        <div id="original-prompt-display" class="original-prompt"></div>
+                        <div id="translated-prompt-display" class="translated-prompt"></div>
                     </div>
                 </div>
                 <button id="new-generation" class="new-btn">

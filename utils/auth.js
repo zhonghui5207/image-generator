@@ -75,15 +75,41 @@ export const checkCredits = async (req, res, next) => {
       requiredCredits = 2; // VIP模型消耗2积分
     }
     
+    // 检查用户积分是否足够
     if (user.credits < requiredCredits) {
-      return res.status(402).json({ 
-        success: false, 
-        message: '积分不足，请充值',
-        creditsNeeded: requiredCredits - user.credits,
-        requiredCredits: requiredCredits
-      });
+      // 如果是流式请求，使用流式响应格式返回错误
+      if (req.headers.accept && req.headers.accept.includes('text/event-stream')) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        
+        // 发送错误信息作为流式事件
+        res.write(`data: ${JSON.stringify({
+          type: 'error',
+          content: {
+            message: '积分不足，请充值',
+            creditsNeeded: requiredCredits - user.credits,
+            requiredCredits: requiredCredits,
+            currentCredits: user.credits
+          }
+        })}\n\n`);
+        
+        // 结束响应
+        res.end();
+        return;
+      } else {
+        // 普通请求返回JSON错误
+        return res.status(402).json({ 
+          success: false, 
+          message: '积分不足，请充值',
+          creditsNeeded: requiredCredits - user.credits,
+          requiredCredits: requiredCredits,
+          currentCredits: user.credits
+        });
+      }
     }
     
+    // 积分充足，继续处理请求
     next();
   } catch (error) {
     console.error('检查积分错误:', error);

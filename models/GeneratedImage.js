@@ -8,7 +8,7 @@ const generatedImageSchema = new mongoose.Schema({
   },
   originalImage: {
     type: String,
-    required: true
+    required: false // 文生图模式没有原始图像，所以设为可选
   },
   generatedImage: {
     type: String,
@@ -26,6 +26,15 @@ const generatedImageSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  mode: {
+    type: String,
+    enum: ['image-to-image', 'text-to-image'],
+    default: 'image-to-image'
+  },
+  model: {
+    type: String,
+    required: true
   }
 });
 

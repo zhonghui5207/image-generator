@@ -1,32 +1,119 @@
 // 主应用初始化
 document.addEventListener('DOMContentLoaded', () => {
+  // 检查所有必要的DOM元素是否存在
+  function getElement(id) {
+    const element = document.getElementById(id);
+    if (!element) {
+      console.error(`Element with id ${id} not found`);
+    }
+    return element;
+  }
+  
   // DOM Elements
-  const dropArea = document.getElementById('drop-area');
-  const fileInput = document.getElementById('file-input');
-  const previewContainer = document.getElementById('preview-container');
-  const previewImage = document.getElementById('preview-image');
-  const removeImageBtn = document.getElementById('remove-image');
-  const uploadForm = document.getElementById('upload-form');
-  const generateBtn = document.getElementById('generate-btn');
-  const promptInput = document.getElementById('prompt');
-  const resultContainer = document.getElementById('result-container');
-  const originalImage = document.getElementById('original-image');
-  const resultContent = document.getElementById('result-content');
-  const newGenerationBtn = document.getElementById('new-generation');
-  const loadingIndicator = document.getElementById('loading');
-  const loadingStatus = document.getElementById('loading-status');
-  const errorContainer = document.getElementById('error-container');
-  const errorMessage = document.getElementById('error-message');
-  const errorCloseBtn = document.getElementById('error-close');
+  const dropArea = getElement('drop-area');
+  const fileInput = getElement('file-input');
+  const previewContainer = getElement('preview-container');
+  const previewImage = getElement('preview-image');
+  const removeImageBtn = getElement('remove-image');
+  const uploadForm = getElement('upload-form');
+  const generateBtn = getElement('generate-btn');
+  const generateBtnText = getElement('generate-btn-text');
+  const promptInput = getElement('prompt');
+  const resultContainer = getElement('result-container');
+  const originalImage = getElement('original-image');
+  const originalImageBox = getElement('original-image-box');
+  const comparisonContainer = getElement('comparison-container');
+  const resultContent = getElement('result-content');
+  const newGenerationBtn = getElement('new-generation');
+  const loadingIndicator = getElement('loading');
+  const loadingStatus = getElement('loading-status');
+  const errorContainer = getElement('error-container');
+  const errorMessage = getElement('error-message');
+  const errorCloseBtn = getElement('error-close');
   const presetButtons = document.querySelectorAll('.preset-btn');
-  const generatedImageContainer = document.getElementById('generated-image-container');
-  const generatedImage = document.getElementById('generated-image');
-  const downloadImageBtn = document.getElementById('download-image');
-  const previewImageBtn = document.getElementById('preview-image-btn');
+  const generatedImageContainer = getElement('generated-image-container');
+  const generatedImage = getElement('generated-image');
+  const downloadImageBtn = getElement('download-image');
+  const previewImageBtn = getElement('preview-image-btn');
+  
+  // 模式切换元素
+  const imageToImageTab = getElement('image-to-image-tab');
+  const textToImageTab = getElement('text-to-image-tab');
+  const imageToImageMode = getElement('image-to-image-mode');
+  const textToImageMode = getElement('text-to-image-mode');
+  const imageStylePresets = getElement('image-style-presets');
+  const textStylePresets = getElement('text-style-presets');
   
   // 初始化时隐藏生成图像容器
   if (generatedImageContainer) {
     generatedImageContainer.style.display = 'none';
+  }
+  
+  // 提示词翻译函数，用于将英文提示词转换为中文
+  async function translatePrompt(prompt) {
+    try {
+      // 使用正则表达式检查是否包含英文字符
+      if (!prompt || !prompt.match(/[a-zA-Z]/)) {
+        return null; // 如果不包含英文，不需要翻译
+      }
+      
+      // 模拟翻译结果（如果没有后端翻译API）
+      // 注意：在实际应用中，应该调用后端翻译API
+      
+      // 常见英文提示词的翻译映射
+      const translations = {
+        'surreal': '超现实的',
+        'deep-sea': '深海',
+        'coral': '珊瑚',
+        'fish': '鱼',
+        'dreamlike': '梦幻般的',
+        'otherworldly': '异世界的',
+        'vibrant': '鲜艳的',
+        'colorful': '多彩的',
+        'vivid': '生动的',
+        'imaginative': '充满想象力的',
+        'ethereal': '空灵的',
+        'intricate': '复杂的',
+        'diverse': '多样化的',
+        'swimming': '游泳',
+        'scene': '场景'
+      };
+      
+      // 简单的翻译逻辑，将英文单词替换为中文
+      let translation = prompt;
+      Object.keys(translations).forEach(key => {
+        const regex = new RegExp(`\\b${key}\\b`, 'gi');
+        translation = translation.replace(regex, translations[key]);
+      });
+      
+      // 如果是文生图模式的提示词，添加翻译提示
+      if (currentMode === 'text-to-image' && !translation.includes('生成一张')) {
+        translation = `根据描述生成一张图像：${translation}`;
+      }
+      
+      return translation;
+      
+      // 实际应用中的API调用代码（当前未使用）
+      /*
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text: prompt })
+      });
+      
+      if (!response.ok) {
+        throw new Error('翻译请求失败');
+      }
+      
+      const data = await response.json();
+      return data.translation;
+      */
+    } catch (error) {
+      console.error('翻译错误:', error);
+      return null;
+    }
   }
   
   // 从服务器获取最新的用户信息
@@ -71,6 +158,66 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!previewContainer.hidden) return;
     fileInput.click();
   });
+  
+  // Variables for mode switching
+  let currentMode = 'image-to-image'; // 默认模式：图生图
+  
+  // 模式切换事件
+  if (imageToImageTab && textToImageTab) {
+    imageToImageTab.addEventListener('click', () => switchMode('image-to-image'));
+    textToImageTab.addEventListener('click', () => switchMode('text-to-image'));
+  } else {
+    console.error('Mode tabs not found');
+  }
+  
+  // 模式切换函数
+  function switchMode(mode) {
+    currentMode = mode;
+    console.log('切换模式为:', mode);
+    
+    // 检查所有必要的元素存在
+    if (!imageToImageTab || !textToImageTab || !imageToImageMode || !textToImageMode || 
+        !imageStylePresets || !textStylePresets || !generateBtnText || !promptInput) {
+      console.error('Missing required elements for mode switching');
+      return;
+    }
+    
+    // 更新标签页状态
+    if (mode === 'image-to-image') {
+      imageToImageTab.classList.add('active');
+      textToImageTab.classList.remove('active');
+      imageToImageMode.style.display = 'block';
+      textToImageMode.style.display = 'none';
+      imageStylePresets.style.display = 'block';
+      textStylePresets.style.display = 'none';
+      generateBtnText.textContent = '生成图像';
+      if (promptInput.hasAttribute('data-image-placeholder')) {
+        promptInput.placeholder = promptInput.getAttribute('data-image-placeholder');
+      }
+    } else {
+      imageToImageTab.classList.remove('active');
+      textToImageTab.classList.add('active');
+      imageToImageMode.style.display = 'none';
+      textToImageMode.style.display = 'block';
+      imageStylePresets.style.display = 'none';
+      textStylePresets.style.display = 'block';
+      generateBtnText.textContent = '生成图像';
+      if (promptInput.hasAttribute('data-text-placeholder')) {
+        promptInput.placeholder = promptInput.getAttribute('data-text-placeholder');
+      }
+    }
+    
+    // 更新比较容器的显示状态
+    updateComparisonContainer();
+    
+    // 重置生成按钮状态
+    if (typeof updateGenerateButtonState === 'function') {
+      updateGenerateButtonState();
+    }
+    
+    // 重置表单验证
+    checkFormValidity();
+  }
 
   // File input change
   fileInput.addEventListener('change', handleFileSelect);
@@ -146,8 +293,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Check if form is valid
   function checkFormValidity() {
-    // 确保生成按钮在满足条件时可点击
-    const isValid = selectedFile && promptInput.value.trim();
+    // 根据当前模式检查表单有效性
+    let isValid = false;
+    
+    if (currentMode === 'image-to-image') {
+      // 图生图模式：需要图片和提示词
+      isValid = selectedFile && promptInput.value.trim();
+    } else {
+      // 文生图模式：只需要提示词
+      isValid = promptInput.value.trim().length >= 5; // 至少需要5个字符的提示词
+    }
+    
     generateBtn.disabled = !isValid;
     
     // 添加颜色反馈，使按钮状态更明显
@@ -156,8 +312,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       generateBtn.classList.remove('active');
     }
-    
-    // console.log('Form validity checked:', isValid, 'selectedFile:', !!selectedFile, 'promptInput:', !!promptInput.value.trim());
   }
 
   // Prompt input event
@@ -424,6 +578,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 处理流式响应
   async function handleStreamResponse(formData) {
+    // 根据当前模式更新比较容器
+    updateComparisonContainer();
     try {
       // 创建进度对象
       const progress = simulateProgress();
@@ -486,16 +642,84 @@ document.addEventListener('DOMContentLoaded', () => {
               // 根据数据类型处理
               if (data.type === 'info') {
                 // 初始信息
-                originalImagePath = data.content.originalImage;
-                originalImage.src = originalImagePath;
+                if (data.content.originalImage) {
+                  originalImagePath = data.content.originalImage;
+                  originalImage.src = originalImagePath;
+                }
                 updateProgress(50, '正在生成图像...', 60);
               } else if (data.type === 'content') {
-                // 流式内容
-                fullContent += data.content;
-                // 不显示内容
+                // 内容块
+                const content = data.content;
+                if (content) {
+                  // 添加到完整内容
+                  fullContent += content;
+                  
+                  // 尝试提取进度信息
+                  const progressMatch = content.match(/>进度\s*\*\*(\d+)%\*\*/i);
+                  if (progressMatch && progressMatch[1]) {
+                    const progressValue = parseInt(progressMatch[1], 10);
+                    if (!isNaN(progressValue)) {
+                      progress.update(progressValue);
+                    }
+                  }
+                }
+              } else if (data.type === 'error') {
+                // 错误信息
+                console.error('收到错误信息:', data.content);
+                
+                // 如果是积分不足错误，显示特定提示
+                if (data.content.message && data.content.message.includes('积分不足')) {
+                  const requiredCredits = data.content.requiredCredits || 1;
+                  const currentCredits = data.content.currentCredits || 0;
+                  const creditsNeeded = data.content.creditsNeeded || (requiredCredits - currentCredits);
+                  
+                  showError(`积分不足！需要 ${requiredCredits} 积分，您当前只有 ${currentCredits} 积分。还需要 ${creditsNeeded} 积分。请前往个人中心充值。`);
+                } else {
+                  // 其他错误
+                  showError(data.content.message || '生成图像时出现错误');
+                }
+                
+                // 重置进度条和加载状态
+                progress.reset();
+                setTimeout(() => {
+                  loadingIndicator.style.display = 'none';
+                }, 1000);
+                
+                // 终止流式连接
+                if (eventSource) {
+                  eventSource.close();
+                }
               } else if (data.type === 'result') {
                 // 最终结果
                 generatedImageUrl = data.content.generatedImageUrl;
+                console.log('收到生成的图像 URL:', generatedImageUrl);
+                
+                // 提取API返回的提示词和用户输入的提示词
+                const apiPrompt = data.content.apiPrompt;
+                const userPrompt = data.content.userPrompt || originalPrompt;
+                
+                console.log('API返回的提示词:', apiPrompt);
+                console.log('用户输入的提示词:', userPrompt);
+                
+                // 立即将图像 URL 设置到图像元素
+                if (generatedImageUrl && generatedImage) {
+                  generatedImage.src = generatedImageUrl;
+                  if (downloadImageBtn) {
+                    downloadImageBtn.href = generatedImageUrl;
+                    downloadImageBtn.download = 'generated-image.jpg';
+                  }
+                  
+                  // 显示图像容器
+                  if (generatedImageContainer) {
+                    generatedImageContainer.style.display = 'block';
+                  }
+                  
+                  // 设置下载和预览功能
+                  setupImageDownload(generatedImageUrl);
+                }
+                
+                // 显示提示词信息 - 使用API返回的提示词
+                displayPromptInfo(apiPrompt, userPrompt);
                 
                 // 更新用户积分
                 if (data.content.credits) {
@@ -519,30 +743,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
       
-      // 处理生成的图像
+      // 处理生成的图像 - 在流式响应结束后再次确认图像已经显示
       if (generatedImageUrl) {
-        // 将图像 URL 设置到图像元素
-        generatedImage.src = generatedImageUrl;
-        downloadImageBtn.href = generatedImageUrl;
-        downloadImageBtn.download = 'generated-image.jpg';
+        console.log('流式响应结束，确认图像 URL:', generatedImageUrl);
+        
+        // 再次确认图像元素已设置
+        if (generatedImage && (!generatedImage.src || generatedImage.src === '#' || generatedImage.src === 'about:blank')) {
+          generatedImage.src = generatedImageUrl;
+        }
+        
+        if (downloadImageBtn) {
+          downloadImageBtn.href = generatedImageUrl;
+          downloadImageBtn.download = 'generated-image.jpg';
+        }
         
         // 设置下载和预览功能
         setupImageDownload(generatedImageUrl);
         
-        // 显示图像容器
-        generatedImageContainer.style.display = 'block';
+        // 确保图像容器可见
+        if (generatedImageContainer) {
+          generatedImageContainer.style.display = 'block';
+        }
+        
+        // 不需要再次显示提示词信息，因为已经在result事件中处理了
       } else {
         // 如果没有图像 URL
-        generatedImageContainer.style.display = 'none';
-        resultContent.innerHTML = '生成成功，但无法提取图像。';
+        console.error('流式响应结束，但没有收到图像 URL');
+        if (generatedImageContainer) {
+          generatedImageContainer.style.display = 'none';
+        }
+        if (resultContent) {
+          resultContent.style.display = 'block';
+          resultContent.innerHTML = '生成成功，但无法提取图像。';
+        }
       }
       
       // 完成进度
       progress.complete();
       
       // 显示结果容器
-      uploadForm.parentElement.hidden = true;
-      resultContainer.hidden = false;
+      if (uploadForm && uploadForm.parentElement) {
+        uploadForm.parentElement.hidden = true;
+      }
+      if (resultContainer) {
+        resultContainer.hidden = false;
+      }
+      
+      // 添加调试信息
+      console.log('流式响应完成，结果容器显示状态:', !resultContainer.hidden);
+      console.log('图像容器显示状态:', generatedImageContainer.style.display);
+      console.log('图像 URL:', generatedImage.src);
       
     } catch (error) {
       console.error('流式响应错误:', error);
@@ -558,8 +808,14 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (!selectedFile) {
+    // 根据当前模式验证表单
+    if (currentMode === 'image-to-image' && !selectedFile) {
       alert('请选择一个图片文件！');
+      return;
+    }
+    
+    if (!promptInput.value.trim()) {
+      alert('请输入提示词！');
       return;
     }
 
@@ -592,9 +848,14 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       // 创建FormData对象
       const formData = new FormData();
-      formData.append('image', selectedFile);
       formData.append('prompt', prompt);
       formData.append('model', selectedModel); // 添加选择的模型
+      formData.append('mode', currentMode); // 添加当前模式
+      
+      // 图生图模式才添加图片
+      if (currentMode === 'image-to-image' && selectedFile) {
+        formData.append('image', selectedFile);
+      }
       
       // 创建进度对象
       const progress = simulateProgress();
@@ -776,15 +1037,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // console.error('错误:', message);
     
     // 重置进度条（如果存在）
-    if (typeof progress !== 'undefined' && progress && typeof progress.reset === 'function') {
-      progress.reset();
-    }
-    
-    // 隐藏加载指示器
-    loadingIndicator.style.display = 'none';
-    
     // 显示错误信息
-    errorMessage.textContent = message;
+    errorMessage.textContent = message || '生成图像时出现错误';
     errorContainer.style.display = 'block';
     
     // 重置表单状态，确保用户可以重新尝试
@@ -793,20 +1047,122 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   function resetForm() {
-    // Reset form
-    uploadForm.reset();
+    // Reset form elements
     removeImage();
+    promptInput.value = '';
+    resultContainer.hidden = true;
+    uploadForm.parentElement.hidden = false;
     
-    // Reset preset buttons
+    // 重置预设按钮的活跃状态
     presetButtons.forEach(btn => btn.classList.remove('active'));
     
-    // 重置生成的图像容器
-    generatedImageContainer.style.display = 'none';
-    generatedImage.src = '#';
-    downloadImageBtn.href = '#';
+    // 重置生成按钮状态
+    generateBtn.disabled = true;
+    generateBtn.classList.remove('active');
     
-    // Show upload form and hide result
-    uploadForm.parentElement.hidden = false;
-    resultContainer.hidden = true;
+    // 清空结果内容
+    resultContent.textContent = '';
+    resultContent.style.display = 'none';
+    
+    // 隐藏生成的图像容器
+    generatedImageContainer.style.display = 'none';
+    
+    // 隐藏提示词显示区域
+    const promptDisplay = document.getElementById('prompt-display');
+    if (promptDisplay) {
+      promptDisplay.style.display = 'none';
+    }
+    
+    // 根据当前模式设置比较容器
+    updateComparisonContainer();
+  }
+  
+  // 更新比较容器的显示状态
+  function updateComparisonContainer() {
+    if (!originalImageBox || !comparisonContainer) {
+      console.error('Missing comparison container elements');
+      return;
+    }
+    
+    if (currentMode === 'text-to-image') {
+      // 文生图模式：隐藏原始图像，显示单图模式
+      originalImageBox.style.display = 'none';
+      comparisonContainer.classList.add('single-image-mode');
+    } else {
+      // 图生图模式：显示原始图像，移除单图模式
+      originalImageBox.style.display = 'block';
+      comparisonContainer.classList.remove('single-image-mode');
+    }
+  }
+  
+  // 显示提示词信息
+  function displayPromptInfo(apiPrompt, userPrompt) {
+    const originalPromptDisplay = document.getElementById('original-prompt-display');
+    const translatedPromptDisplay = document.getElementById('translated-prompt-display');
+    const promptDisplay = document.getElementById('prompt-display');
+    
+    if (!originalPromptDisplay || !promptDisplay) {
+      console.error('Missing prompt display elements');
+      return;
+    }
+    
+    // 显示API返回的英文提示词
+    if (apiPrompt) {
+      originalPromptDisplay.innerHTML = `<strong>AI生成的描述：</strong> ${apiPrompt}`;
+      originalPromptDisplay.style.display = 'block';
+    } else {
+      originalPromptDisplay.style.display = 'none';
+    }
+    
+    // 显示用户输入的提示词或翻译
+    if (userPrompt && translatedPromptDisplay) {
+      // 如果是中文提示词，直接显示
+      if (!userPrompt.match(/[a-zA-Z]/) || userPrompt.match(/[一-龥]/)) {
+        translatedPromptDisplay.innerHTML = `<strong>原始提示词：</strong> ${userPrompt}`;
+        translatedPromptDisplay.style.display = 'block';
+      } else if (apiPrompt) {
+        // 如果有API提示词，尝试翻译
+        translatePrompt(apiPrompt).then(translation => {
+          if (translation) {
+            translatedPromptDisplay.innerHTML = `<strong>翻译：</strong> ${translation}`;
+            translatedPromptDisplay.style.display = 'block';
+          }
+        }).catch(err => {
+          console.error('翻译错误:', err);
+          // 如果翻译失败，显示原始用户提示词
+          translatedPromptDisplay.innerHTML = `<strong>原始提示词：</strong> ${userPrompt}`;
+          translatedPromptDisplay.style.display = 'block';
+        });
+      } else {
+        // 没有API提示词，显示用户提示词
+        translatedPromptDisplay.innerHTML = `<strong>原始提示词：</strong> ${userPrompt}`;
+        translatedPromptDisplay.style.display = 'block';
+      }
+    }
+    
+    // 显示提示词区域
+    promptDisplay.style.display = 'block';
+  }
+  
+  // 添加新生成按钮的事件处理
+  // 注意：这里使用变量而不是常量，因为已经在前面声明过
+  newGenerationBtn = document.getElementById('new-generation');
+  if (newGenerationBtn) {
+    newGenerationBtn.addEventListener('click', () => {
+      resetForm();
+      // 重置到上传表单状态
+      uploadForm.parentElement.hidden = false;
+      resultContainer.hidden = true;
+    });
+  }
+  
+  // 初始化模式 - 在所有函数定义完成后调用
+  // 确保所有必要元素存在后再初始化
+  if (imageToImageTab && textToImageTab && imageToImageMode && textToImageMode) {
+    switchMode('image-to-image');
+    updateComparisonContainer();
+    console.log('Mode initialization completed');
+  } else {
+    console.error('Cannot initialize modes: missing required elements');
   }
 });

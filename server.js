@@ -81,13 +81,26 @@ function image2Base64(imagePath) {
 // API endpoint for image generation
 app.post('/api/generate-image', authenticate, checkCredits, upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No image uploaded' });
+    // 获取生成模式
+    const mode = req.body.mode || 'image-to-image';
+    
+    // 检查图生图模式是否需要图片
+    if (mode === 'image-to-image' && !req.file) {
+      return res.status(400).json({ error: '图生图模式需要上传图片' });
     }
 
     const prompt = req.body.prompt || 'Transform this image into a creative style';
-    const imagePath = req.file.path;
-    const imageType = path.extname(req.file.originalname).substring(1);
+    let imagePath = null;
+    let imageType = null;
+    let originalImagePath = null;
+    
+    // 只有图生图模式才处理图片
+    if (mode === 'image-to-image' && req.file) {
+      imagePath = req.file.path;
+      imageType = path.extname(req.file.originalname).substring(1);
+      // 将原始图像保存到公共目录
+      originalImagePath = `/uploads/${path.basename(imagePath)}`;
+    }
     
     // 获取所选模型，如果没有指定则使用环境变量中的默认值
     const selectedModel = req.body.model || process.env.OPENAI_MODEL;
@@ -152,15 +165,6 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
     try {
       console.log("Preparing API request...");
       
-      // 准备图像数据
-      const imageBase64 = image2Base64(imagePath);
-      console.log("Image converted to base64, length:", imageBase64.length);
-      
-      // 不再使用单独的连接测试，因为它可能导致额外的错误
-      
-      // 将原始图像保存到公共目录
-      const originalImagePath = `/uploads/${path.basename(imagePath)}`;
-      
       // 使用 OpenAI 的 chat completions API
       console.log("Sending request to OpenAI API...");
       // 检查是否请求流式响应
@@ -175,10 +179,15 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         
-        // 创建流式请求
-        const stream = await openai.chat.completions.create({
-          model: selectedModel,
-          messages: [{
+        // 准备消息内容
+        let messages = [];
+        
+        if (mode === 'image-to-image') {
+          // 图生图模式：包含图片和提示词
+          const imageBase64 = image2Base64(imagePath);
+          console.log("Image converted to base64, length:", imageBase64.length);
+          
+          messages = [{
             role: 'user', 
             content: [
               {
@@ -192,21 +201,42 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
                 text: prompt
               },
             ]
-          }],
+          }];
+        } else {
+          // 文生图模式：只包含提示词
+          messages = [{
+            role: 'user',
+            content: [
+              {
+                type: "text",
+                text: `请根据以下描述生成一张图片：${prompt}`
+              }
+            ]
+          }];
+        }
+        
+        // 创建流式请求
+        const stream = await openai.chat.completions.create({
+          model: selectedModel,
+          messages: messages,
           stream: true,
           timeout: 300000  // 增加到 5 分钟超时
         });
         
         console.log("流式连接已建立，开始发送数据...");
         
-        // 向客户端发送初始信息
-        res.write(`data: ${JSON.stringify({
+        // 发送初始信息
+        const initialData = {
           type: 'info',
-          content: {
-            originalImage: `/uploads/${path.basename(imagePath)}`,
-            creditsUsed: creditsToUse
-          }
-        })}\n\n`);
+          content: {}
+        };
+        
+        // 只有图生图模式才发送原始图像路径
+        if (mode === 'image-to-image' && originalImagePath) {
+          initialData.content.originalImage = originalImagePath;
+        }
+        
+        res.write(`data: ${JSON.stringify(initialData)}\n\n`);
         
         // 收集完整响应内容（用于处理图像 URL 和历史记录）
         let fullContent = '';
@@ -240,9 +270,18 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         const totalTime = (Date.now() - startTime) / 1000;
         console.log(`[${new Date().toISOString()}] 流式响应完成，共接收 ${chunkCount} 个数据块，总内容长度: ${fullContent.length}，总用时: ${totalTime.toFixed(1)}秒`);
         
-        // 处理图像 URL 提取
+        // 处理图像 URL 提取和API返回的提示词
         let generatedImageUrl = '';
+        let apiPrompt = '';
+        
         console.log('处理图像 URL 提取，原始结果:', fullContent);
+        
+        // 尝试提取API返回的提示词
+        const promptMatch = fullContent.match(/"prompt":\s*"([^"]+)"/i);
+        if (promptMatch && promptMatch[1]) {
+          apiPrompt = promptMatch[1];
+          console.log('提取到API返回的提示词:', apiPrompt);
+        }
         
         // 尝试匹配图像 URL
         let imgUrlMatch = fullContent.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/i);
@@ -261,7 +300,7 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         
         if (!generatedImageUrl) {
           console.log('未找到图像 URL，使用原始图像作为占位');
-          generatedImageUrl = `/uploads/${path.basename(imagePath)}`;
+          generatedImageUrl = originalImagePath;
         }
         
         // 扣除用户积分
@@ -272,14 +311,41 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           null
         );
         
-        // 创建历史记录
-        const imageHistory = await GeneratedImage.create({
-          user: req.user._id,
-          originalImage: `/uploads/${path.basename(imagePath)}`,
+        // 保存生成历史记录
+        const generatedImageData = {
+          user: req.user._id, // 修正：使用user字段而不是userId，与模型定义一致,
           generatedImage: generatedImageUrl,
           prompt: prompt,
-          creditsUsed: creditsToUse
+          model: selectedModel,
+          creditsUsed: creditsToUse,
+          mode: mode
+        };
+        
+        // 只有图生图模式才添加原始图像
+        if (mode === 'image-to-image' && originalImagePath) {
+          generatedImageData.originalImage = originalImagePath;
+        }
+        
+        const generatedImage = new GeneratedImage(generatedImageData);
+        
+        // 保存到数据库
+        await generatedImage.save().catch(err => {
+          console.error('保存历史记录失败:', err);
         });
+        
+        // 尝试翻译提示词（如果是英文）
+        let translatedPrompt = null;
+        let apiPromptToSend = apiPrompt || prompt; // 优先使用API返回的提示词
+        
+        if (apiPromptToSend && /[a-zA-Z]/.test(apiPromptToSend)) {
+          try {
+            // 这里可以调用翻译API，但为了简化，我们在前端处理翻译
+            // translatedPrompt = await translateText(apiPromptToSend);
+            translatedPrompt = apiPromptToSend; // 前端会处理翻译
+          } catch (error) {
+            console.error('翻译提示词时出错:', error);
+          }
+        }
         
         // 发送最终结果
         res.write(`data: ${JSON.stringify({
@@ -287,11 +353,14 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           content: {
             success: true,
             generatedImageUrl: generatedImageUrl,
+            apiPrompt: apiPrompt, // 发送API返回的英文提示词
+            userPrompt: prompt, // 发送用户输入的原始提示词
+            translatedPrompt: translatedPrompt,
             credits: {
               used: creditsToUse,
               remaining: newCreditBalance
             },
-            historyId: imageHistory._id
+            historyId: generatedImage._id
           }
         })}\n\n`);
         
@@ -300,9 +369,13 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         return;
       } else {
         // 非流式响应处理（原有方式）
-        const response = await openai.chat.completions.create({
-          model: selectedModel,
-          messages: [{
+        let messages = [];
+        
+        if (mode === 'image-to-image') {
+          // 图生图模式：包含图片和提示词
+          const imageBase64 = image2Base64(imagePath);
+          
+          messages = [{
             role: 'user', 
             content: [
               {
@@ -316,7 +389,23 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
                 text: prompt
               },
             ]
-          }],
+          }];
+        } else {
+          // 文生图模式：只包含提示词
+          messages = [{
+            role: 'user',
+            content: [
+              {
+                type: "text",
+                text: `请根据以下描述生成一张图片：${prompt}`
+              }
+            ]
+          }];
+        }
+        
+        const response = await openai.chat.completions.create({
+          model: selectedModel,
+          messages: messages,
           timeout: 300000  // 增加到 5 分钟超时
         });
 
@@ -369,13 +458,26 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           generatedImageUrl = originalImagePath;
         }
         
-        // 创建历史记录
-        const imageHistory = await GeneratedImage.create({
-          user: req.user._id,
-          originalImage: originalImagePath,
+        // 保存生成历史记录
+        const generatedImageData = {
+          user: req.user._id, // 修正：使用user字段而不是userId，与模型定义一致,
           generatedImage: generatedImageUrl,
           prompt: prompt,
-          creditsUsed: creditsToUse  // 使用实际消耗的积分数量
+          model: selectedModel,
+          creditsUsed: creditsToUse,
+          mode: mode
+        };
+        
+        // 只有图生图模式才添加原始图像
+        if (mode === 'image-to-image' && originalImagePath) {
+          generatedImageData.originalImage = originalImagePath;
+        }
+        
+        const generatedImage = new GeneratedImage(generatedImageData);
+        
+        // 保存到数据库
+        await generatedImage.save().catch(err => {
+          console.error('保存历史记录失败:', err);
         });
         
         // 扣除用户积分
