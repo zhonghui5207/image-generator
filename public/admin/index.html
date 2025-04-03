@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>控制面板 - AI绘画生成器后台</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h2>AI绘画生成器</h2>
+                <p>管理后台</p>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="active"><i class="bi bi-speedometer2"></i> 控制面板</a></li>
+                <li><a href="users.html"><i class="bi bi-people"></i> 用户管理</a></li>
+                <li><a href="credits.html"><i class="bi bi-coin"></i> 积分管理</a></li>
+                <li><a href="orders.html"><i class="bi bi-cart"></i> 订单管理</a></li>
+                <li><a href="images.html"><i class="bi bi-image"></i> 图片管理</a></li>
+                <li><a href="settings.html"><i class="bi bi-gear"></i> 系统设置</a></li>
+            </ul>
+        </aside>
+
+        <!-- 主要内容区域 -->
+        <main class="main-content">
+            <!-- 顶部导航栏 -->
+            <header class="header">
+                <div class="header-left">
+                    <button class="toggle-sidebar">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <div class="header-title">
+                        <h2>控制面板</h2>
+                    </div>
+                </div>
+                <div class="user-menu">
+                    <button class="user-menu-btn">
+                        <span id="admin-username">管理员</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <div class="user-dropdown">
+                        <a href="settings.html"><i class="bi bi-gear"></i> 设置</a>
+                        <a href="#" id="logout-btn"><i class="bi bi-box-arrow-right"></i> 退出登录</a>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 数据统计卡片 -->
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background-color: rgba(0, 123, 255, 0.1); color: #007bff;">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>总用户数</h3>
+                        <p id="total-users">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background-color: rgba(40, 167, 69, 0.1); color: #28a745;">
+                        <i class="bi bi-cart"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>总订单数</h3>
+                        <p id="total-orders">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background-color: rgba(220, 53, 69, 0.1); color: #dc3545;">
+                        <i class="bi bi-currency-yen"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>总收入(元)</h3>
+                        <p id="total-revenue">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background-color: rgba(255, 193, 7, 0.1); color: #ffc107;">
+                        <i class="bi bi-image"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>生成图片数</h3>
+                        <p id="total-images">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 近期数据 -->
+            <div class="recent-data">
+                <!-- 近期订单 -->
+                <div class="data-card">
+                    <div class="card-header">
+                        <h3>近期订单</h3>
+                        <a href="orders.html" class="view-all">查看全部</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>订单号</th>
+                                        <th>用户</th>
+                                        <th>金额</th>
+                                        <th>状态</th>
+                                        <th>时间</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-orders">
+                                    <!-- 订单数据将通过JavaScript动态加载 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 新注册用户 -->
+                <div class="data-card">
+                    <div class="card-header">
+                        <h3>新注册用户</h3>
+                        <a href="users.html" class="view-all">查看全部</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>用户名</th>
+                                        <th>邮箱</th>
+                                        <th>注册时间</th>
+                                        <th>状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-users">
+                                    <!-- 用户数据将通过JavaScript动态加载 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/admin.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查管理员登录状态
+            adminUtils.checkAdminAuth();
+            
+            // 加载仪表盘数据
+            loadDashboardData();
+            
+            // 加载近期订单和用户数据
+            loadRecentOrders();
+            loadRecentUsers();
+        });
+        
+        // 加载仪表盘统计数据
+        async function loadDashboardData() {
+            try {
+                const [usersRes, ordersRes, imagesRes] = await Promise.all([
+                    adminUtils.apiRequest('/api/admin/users/stats', { method: 'GET' }),
+                    adminUtils.apiRequest('/api/admin/orders/stats', { method: 'GET' }),
+                    adminUtils.apiRequest('/api/admin/images/stats', { method: 'GET' })
+                ]);
+                
+                // 更新统计数据
+                document.getElementById('total-users').textContent = usersRes.totalUsers || 0;
+                document.getElementById('total-orders').textContent = ordersRes.totalOrders || 0;
+                document.getElementById('total-revenue').textContent = (ordersRes.totalRevenue / 100).toFixed(2) || '0.00';
+                document.getElementById('total-images').textContent = imagesRes.totalCount || 0;
+            } catch (error) {
+                console.error('加载仪表盘数据失败:', error);
+                adminUtils.showNotification('加载数据失败，请刷新页面重试', 'error');
+            }
+        }
+        
+        // 加载近期订单
+        async function loadRecentOrders() {
+            try {
+                const response = await adminUtils.apiRequest('/api/admin/orders?limit=5', { method: 'GET' });
+                const ordersTableBody = document.getElementById('recent-orders');
+                
+                if (!response.orders || response.orders.length === 0) {
+                    ordersTableBody.innerHTML = '<tr><td colspan="5" class="empty-table-message">暂无订单数据</td></tr>';
+                    return;
+                }
+                
+                let html = '';
+                response.orders.forEach(order => {
+                    // 根据订单状态设置不同样式
+                    let statusClass = '';
+                    let statusText = '';
+                    
+                    switch(order.status) {
+                        case 'pending':
+                            statusClass = 'badge-warning';
+                            statusText = '待支付';
+                            break;
+                        case 'paid':
+                            statusClass = 'badge-success';
+                            statusText = '已支付';
+                            break;
+                        case 'completed':
+                            statusClass = 'badge-info';
+                            statusText = '已完成';
+                            break;
+                        case 'cancelled':
+                            statusClass = 'badge-danger';
+                            statusText = '已取消';
+                            break;
+                        default:
+                            statusClass = 'badge-secondary';
+                            statusText = '未知';
+                    }
+                    
+                    html += `
+                        <tr>
+                            <td>${order.orderNumber}</td>
+                            <td>${adminUtils.escapeHtml(order.username)}</td>
+                            <td>¥${(order.amount / 100).toFixed(2)}</td>
+                            <td><span class="badge ${statusClass}">${statusText}</span></td>
+                            <td>${adminUtils.formatDateTime(order.createdAt)}</td>
+                        </tr>
+                    `;
+                });
+                
+                ordersTableBody.innerHTML = html;
+            } catch (error) {
+                console.error('加载近期订单失败:', error);
+                document.getElementById('recent-orders').innerHTML = 
+                    '<tr><td colspan="5" class="empty-table-message">加载订单数据失败</td></tr>';
+            }
+        }
+        
+        // 加载新注册用户
+        async function loadRecentUsers() {
+            try {
+                const response = await adminUtils.apiRequest('/api/admin/users?limit=5', { method: 'GET' });
+                const usersTableBody = document.getElementById('recent-users');
+                
+                if (!response.users || response.users.length === 0) {
+                    usersTableBody.innerHTML = '<tr><td colspan="4" class="empty-table-message">暂无用户数据</td></tr>';
+                    return;
+                }
+                
+                let html = '';
+                response.users.forEach(user => {
+                    // 根据用户状态设置不同样式
+                    const statusClass = user.status === 'active' ? 'badge-success' : 'badge-danger';
+                    const statusText = user.status === 'active' ? '正常' : '禁用';
+                    
+                    html += `
+                        <tr>
+                            <td>${adminUtils.escapeHtml(user.username)}</td>
+                            <td>${adminUtils.escapeHtml(user.email)}</td>
+                            <td>${adminUtils.formatDateTime(user.createdAt)}</td>
+                            <td><span class="badge ${statusClass}">${statusText}</span></td>
+                        </tr>
+                    `;
+                });
+                
+                usersTableBody.innerHTML = html;
+            } catch (error) {
+                console.error('加载新注册用户失败:', error);
+                document.getElementById('recent-users').innerHTML = 
+                    '<tr><td colspan="4" class="empty-table-message">加载用户数据失败</td></tr>';
+            }
+        }
+    </script>
+</body>
+</html>

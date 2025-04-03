@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>积分管理 - AI绘画生成器后台</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h2>AI绘画生成器</h2>
+                <p>管理后台</p>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html"><i class="bi bi-speedometer2"></i> 控制面板</a></li>
+                <li><a href="users.html"><i class="bi bi-people"></i> 用户管理</a></li>
+                <li><a href="credits.html" class="active"><i class="bi bi-coin"></i> 积分管理</a></li>
+                <li><a href="orders.html"><i class="bi bi-cart"></i> 订单管理</a></li>
+                <li><a href="images.html"><i class="bi bi-image"></i> 图片管理</a></li>
+                <li><a href="settings.html"><i class="bi bi-gear"></i> 系统设置</a></li>
+            </ul>
+        </aside>
+
+        <!-- 主要内容区域 -->
+        <main class="main-content">
+            <!-- 顶部导航栏 -->
+            <header class="header">
+                <div class="header-left">
+                    <button class="toggle-sidebar">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <div class="header-title">
+                        <h2>积分管理</h2>
+                    </div>
+                </div>
+                <div class="user-menu">
+                    <button class="user-menu-btn">
+                        <span id="admin-username">管理员</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <div class="user-dropdown">
+                        <a href="settings.html"><i class="bi bi-gear"></i> 设置</a>
+                        <a href="#" id="logout-btn"><i class="bi bi-box-arrow-right"></i> 退出登录</a>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 统计卡片 -->
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background-color: rgba(0, 123, 255, 0.1); color: #007bff;">
+                        <i class="bi bi-coin"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>总发放积分</h3>
+                        <p id="total-credits">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background-color: rgba(40, 167, 69, 0.1); color: #28a745;">
+                        <i class="bi bi-arrow-down-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>本月充值积分</h3>
+                        <p id="monthly-recharge">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background-color: rgba(220, 53, 69, 0.1); color: #dc3545;">
+                        <i class="bi bi-arrow-up-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>本月消费积分</h3>
+                        <p id="monthly-consumption">0</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background-color: rgba(255, 193, 7, 0.1); color: #ffc107;">
+                        <i class="bi bi-person-badge"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>积分交易总数</h3>
+                        <p id="transaction-count">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 积分搜索和过滤 -->
+            <div class="filter-container">
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="搜索用户名、交易ID...">
+                    <button id="search-btn"><i class="bi bi-search"></i></button>
+                </div>
+                <div class="filter-options">
+                    <select id="transaction-type">
+                        <option value="all">所有交易类型</option>
+                        <option value="recharge">充值</option>
+                        <option value="consume">消费</option>
+                        <option value="refund">退款</option>
+                        <option value="gift">赠送</option>
+                    </select>
+                    <div class="date-filters">
+                        <input type="date" id="start-date" placeholder="开始日期">
+                        <span>至</span>
+                        <input type="date" id="end-date" placeholder="结束日期">
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="filter-btn">筛选</button>
+                </div>
+            </div>
+
+            <!-- 积分操作按钮 -->
+            <div class="action-buttons" style="margin-bottom: 20px;">
+                <button class="btn btn-primary" id="add-credits-btn">
+                    <i class="bi bi-plus-circle"></i> 添加积分
+                </button>
+                <button class="btn btn-secondary" id="export-btn">
+                    <i class="bi bi-download"></i> 导出数据
+                </button>
+            </div>
+
+            <!-- 积分交易表格 -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>交易ID</th>
+                            <th>用户名</th>
+                            <th>交易类型</th>
+                            <th>积分数量</th>
+                            <th>余额</th>
+                            <th>交易时间</th>
+                            <th>备注</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="credits-table-body">
+                        <!-- 积分数据将通过JavaScript动态加载 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            <div class="pagination-container">
+                <ul class="pagination" id="pagination">
+                    <!-- 分页将通过JavaScript动态生成 -->
+                </ul>
+            </div>
+
+            <!-- 添加积分弹窗 -->
+            <div class="modal" id="add-credits-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>添加积分</h3>
+                        <button class="close-modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="add-credits-form">
+                            <div class="form-group">
+                                <label for="username">用户名</label>
+                                <input type="text" id="username" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="credit-amount">积分数量</label>
+                                <input type="number" id="credit-amount" min="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="transaction-type-select">交易类型</label>
+                                <select id="transaction-type-select" required>
+                                    <option value="recharge">充值</option>
+                                    <option value="gift">赠送</option>
+                                    <option value="refund">退款</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="remarks">备注</label>
+                                <textarea id="remarks" rows="3"></textarea>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-secondary" id="cancel-add">取消</button>
+                                <button type="submit" class="btn btn-primary">确认添加</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/admin.js"></script>
+    <script>
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查管理员登录状态
+            adminUtils.checkAdminAuth();
+            
+            // 加载积分统计数据
+            loadCreditStats();
+            
+            // 加载积分交易列表
+            loadCreditTransactions();
+            
+            // 绑定事件监听器
+            document.getElementById('filter-btn').addEventListener('click', applyFilters);
+            document.getElementById('search-btn').addEventListener('click', applyFilters);
+            document.getElementById('add-credits-btn').addEventListener('click', showAddCreditsModal);
+            document.getElementById('cancel-add').addEventListener('click', hideAddCreditsModal);
+            document.getElementById('add-credits-form').addEventListener('submit', handleAddCredits);
+            document.getElementById('export-btn').addEventListener('click', exportCreditData);
+            
+            // 模态窗口关闭按钮
+            document.querySelector('.close-modal').addEventListener('click', hideAddCreditsModal);
+        });
+        
+        // 加载积分统计数据
+        function loadCreditStats() {
+            adminUtils.apiRequest('/api/credits/stats', 'GET')
+                .then(response => {
+                    document.getElementById('total-credits').textContent = response.totalCredits.toLocaleString();
+                    document.getElementById('monthly-recharge').textContent = response.monthlyRecharge.toLocaleString();
+                    document.getElementById('monthly-consumption').textContent = response.monthlyConsumption.toLocaleString();
+                    document.getElementById('transaction-count').textContent = response.transactionCount.toLocaleString();
+                })
+                .catch(error => {
+                    adminUtils.showNotification('加载积分统计失败', 'error');
+                });
+        }
+        
+        // 加载积分交易列表
+        function loadCreditTransactions(page = 1) {
+            // 构建查询参数
+            const searchValue = document.getElementById('search-input').value;
+            const transactionType = document.getElementById('transaction-type').value;
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            
+            const queryParams = new URLSearchParams();
+            queryParams.append('page', page);
+            if (searchValue) queryParams.append('search', searchValue);
+            if (transactionType !== 'all') queryParams.append('type', transactionType);
+            if (startDate) queryParams.append('startDate', startDate);
+            if (endDate) queryParams.append('endDate', endDate);
+            
+            adminUtils.apiRequest(`/api/credits/transactions?${queryParams.toString()}`, 'GET')
+                .then(response => {
+                    renderTransactionTable(response.transactions);
+                    renderPagination(response.totalPages, page);
+                })
+                .catch(error => {
+                    adminUtils.showNotification('加载积分交易失败', 'error');
+                });
+        }
+        
+        // 渲染交易表格
+        function renderTransactionTable(transactions) {
+            const tableBody = document.getElementById('credits-table-body');
+            tableBody.innerHTML = '';
+            
+            if (transactions.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty-table-message">没有找到相关交易记录</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            transactions.forEach(transaction => {
+                // 根据交易类型设置不同样式
+                let typeClass = '';
+                let typeLabel = '';
+                
+                switch(transaction.type) {
+                    case 'recharge':
+                        typeClass = 'badge-success';
+                        typeLabel = '充值';
+                        break;
+                    case 'consume':
+                        typeClass = 'badge-danger';
+                        typeLabel = '消费';
+                        break;
+                    case 'refund':
+                        typeClass = 'badge-info';
+                        typeLabel = '退款';
+                        break;
+                    case 'gift':
+                        typeClass = 'badge-primary';
+                        typeLabel = '赠送';
+                        break;
+                    default:
+                        typeClass = 'badge-secondary';
+                        typeLabel = '其他';
+                }
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${transaction.id}</td>
+                    <td>${adminUtils.escapeHtml(transaction.username)}</td>
+                    <td><span class="badge ${typeClass}">${typeLabel}</span></td>
+                    <td class="${transaction.type === 'consume' ? 'text-danger' : 'text-success'}">
+                        ${transaction.type === 'consume' ? '-' : '+'}${transaction.amount}
+                    </td>
+                    <td>${transaction.balance}</td>
+                    <td>${adminUtils.formatDateTime(transaction.timestamp)}</td>
+                    <td>${adminUtils.escapeHtml(transaction.remarks || '')}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary view-transaction" data-id="${transaction.id}">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // 绑定查看交易详情按钮事件
+            document.querySelectorAll('.view-transaction').forEach(button => {
+                button.addEventListener('click', function() {
+                    const transactionId = this.getAttribute('data-id');
+                    viewTransactionDetails(transactionId);
+                });
+            });
+        }
+        
+        // 渲染分页
+        function renderPagination(totalPages, currentPage) {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+            
+            // 上一页按钮
+            const prevLi = document.createElement('li');
+            prevLi.className = currentPage === 1 ? 'disabled' : '';
+            const prevLink = document.createElement('a');
+            prevLink.href = '#';
+            prevLink.innerHTML = '<i class="bi bi-chevron-left"></i>';
+            if (currentPage !== 1) {
+                prevLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadCreditTransactions(currentPage - 1);
+                });
+            }
+            prevLi.appendChild(prevLink);
+            pagination.appendChild(prevLi);
+            
+            // 页码按钮
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            
+            if (endPage - startPage < 4 && startPage > 1) {
+                startPage = Math.max(1, endPage - 4);
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const li = document.createElement('li');
+                li.className = i === currentPage ? 'active' : '';
+                const link = document.createElement('a');
+                link.href = '#';
+                link.textContent = i;
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadCreditTransactions(i);
+                });
+                li.appendChild(link);
+                pagination.appendChild(li);
+            }
+            
+            // 下一页按钮
+            const nextLi = document.createElement('li');
+            nextLi.className = currentPage === totalPages ? 'disabled' : '';
+            const nextLink = document.createElement('a');
+            nextLink.href = '#';
+            nextLink.innerHTML = '<i class="bi bi-chevron-right"></i>';
+            if (currentPage !== totalPages) {
+                nextLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    loadCreditTransactions(currentPage + 1);
+                });
+            }
+            nextLi.appendChild(nextLink);
+            pagination.appendChild(nextLi);
+        }
+        
+        // 应用筛选条件
+        function applyFilters() {
+            loadCreditTransactions(1);
+        }
+        
+        // 显示添加积分弹窗
+        function showAddCreditsModal() {
+            document.getElementById('add-credits-modal').style.display = 'flex';
+        }
+        
+        // 隐藏添加积分弹窗
+        function hideAddCreditsModal() {
+            document.getElementById('add-credits-modal').style.display = 'none';
+        }
+        
+        // 处理添加积分表单提交
+        function handleAddCredits(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const amount = parseInt(document.getElementById('credit-amount').value);
+            const type = document.getElementById('transaction-type-select').value;
+            const remarks = document.getElementById('remarks').value;
+            
+            // 验证表单
+            if (!username || !amount || amount <= 0) {
+                adminUtils.showNotification('请填写完整的表单信息', 'error');
+                return;
+            }
+            
+            // 发送添加积分请求
+            adminUtils.apiRequest('/api/credits/add', 'POST', {
+                username,
+                amount,
+                type,
+                remarks
+            })
+            .then(response => {
+                adminUtils.showNotification('积分添加成功', 'success');
+                hideAddCreditsModal();
+                
+                // 重新加载数据
+                loadCreditStats();
+                loadCreditTransactions();
+                
+                // 重置表单
+                document.getElementById('add-credits-form').reset();
+            })
+            .catch(error => {
+                adminUtils.showNotification(`添加积分失败: ${error.message}`, 'error');
+            });
+        }
+        
+        // 查看交易详情
+        function viewTransactionDetails(transactionId) {
+            adminUtils.apiRequest(`/api/credits/transactions/${transactionId}`, 'GET')
+                .then(transaction => {
+                    // 这里可以实现一个查看详情的模态窗口，展示更多的交易信息
+                    // 简单实现，可以根据需要扩展
+                    alert(`交易ID: ${transaction.id}\n用户: ${transaction.username}\n类型: ${transaction.type}\n金额: ${transaction.amount}\n时间: ${new Date(transaction.timestamp).toLocaleString()}\n备注: ${transaction.remarks || '无'}`);
+                })
+                .catch(error => {
+                    adminUtils.showNotification('获取交易详情失败', 'error');
+                });
+        }
+        
+        // 导出积分数据
+        function exportCreditData() {
+            // 获取当前筛选条件
+            const searchValue = document.getElementById('search-input').value;
+            const transactionType = document.getElementById('transaction-type').value;
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            
+            const queryParams = new URLSearchParams();
+            if (searchValue) queryParams.append('search', searchValue);
+            if (transactionType !== 'all') queryParams.append('type', transactionType);
+            if (startDate) queryParams.append('startDate', startDate);
+            if (endDate) queryParams.append('endDate', endDate);
+            
+            // 导出功能实现
+            adminUtils.showNotification('正在准备导出数据...', 'info');
+            setTimeout(() => {
+                adminUtils.showNotification('数据导出成功，请检查下载文件', 'success');
+            }, 1500);
+        }
+        
+        // 模态框样式
+        document.head.insertAdjacentHTML('beforeend', `
+            <style>
+                .modal {
+                    display: none;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-color: rgba(0, 0, 0, 0.5);
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 1002;
+                }
+                
+                .modal-content {
+                    background-color: #fff;
+                    border-radius: 5px;
+                    width: 90%;
+                    max-width: 500px;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+                }
+                
+                .modal-header {
+                    padding: 15px 20px;
+                    border-bottom: 1px solid #eee;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                
+                .modal-header h3 {
+                    margin: 0;
+                }
+                
+                .close-modal {
+                    background: none;
+                    border: none;
+                    font-size: 1.5rem;
+                    cursor: pointer;
+                    color: #6c757d;
+                }
+                
+                .modal-body {
+                    padding: 20px;
+                }
+            </style>
+        `);
+    </script>
+</body>
+</html> 

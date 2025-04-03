@@ -1,0 +1,8 @@
+{
+  "siteName": "图像生成器",
+  "siteDescription": "使用AI生成精美图片",
+  "contactEmail": "contact@example.com",
+  "initialCredits": 10,
+  "requireEmailVerification": true,
+  "allowRegistration": true
+}

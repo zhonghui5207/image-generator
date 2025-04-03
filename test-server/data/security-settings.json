@@ -1,0 +1,12 @@
+{
+  "jwtSecret": "your-secret-key-should-be-long-and-random",
+  "jwtExpiration": 24,
+  "enableSensitiveFilter": true,
+  "sensitiveWords": [
+    "敏感词1",
+    "敏感词2",
+    "敏感词3"
+  ],
+  "requestsPerMinute": 60,
+  "maxImagesPerDay": 20
+}

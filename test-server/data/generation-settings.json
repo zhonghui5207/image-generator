@@ -1,0 +1,12 @@
+{
+  "creditsPerImage": 5,
+  "modelEndpoint": "https://api.example.com/generate",
+  "modelApiKey": "sk-example123456",
+  "useLocalModel": false,
+  "styles": [
+    "写实风格",
+    "动漫风格",
+    "水彩风格",
+    "油画风格"
+  ]
+}

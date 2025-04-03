@@ -251,18 +251,6 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         const startTime = Date.now();
         console.log(`[${new Date().toISOString()}] 开始接收流式数据`);
         
-        // 发送初始进度
-        res.write(`data: ${JSON.stringify({
-          type: 'content',
-          content: ">进度 **10%**"
-        })}\n\n`);
-        
-        // 设置最大chunk预期数和当前阶段
-        const estimatedMaxChunks = 200; // 预计的最大数据块数量
-        let currentStage = 1; // 当前处理阶段 (1-4)
-        let lastProgressSent = 10; // 上次发送的进度
-        let lastProgressTime = Date.now(); // 上次发送进度的时间
-        
         for await (const chunk of stream) {
           const content = chunk.choices[0]?.delta?.content || '';
           chunkCount++;
@@ -276,45 +264,13 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
               content: content
             })}\n\n`);
             
-            // 计算基于数据块的进度百分比，从10%到85%
-            const baseProgress = 10 + Math.min(75, Math.floor((chunkCount / estimatedMaxChunks) * 75));
-            
-            // 每10个数据块或者至少3秒后发送一次进度更新
-            const shouldSendProgress = (chunkCount % 10 === 0) || 
-                                     (Date.now() - lastProgressTime > 3000 && baseProgress > lastProgressSent);
-            
-            if (shouldSendProgress) {
-              // 更新阶段
-              if (baseProgress > 70) currentStage = 4;
-              else if (baseProgress > 40) currentStage = 3;
-              else if (baseProgress > 15) currentStage = 2;
-              
-              // 避免进度后退
-              const progressToSend = Math.max(lastProgressSent, baseProgress);
-              
-              // 只有当进度有实质性提升(至少2%)时才发送
-              if (progressToSend >= lastProgressSent + 2) {
-                const elapsedSeconds = (Date.now() - startTime) / 1000;
-                console.log(`[${new Date().toISOString()}] 已接收 ${chunkCount} 个数据块，进度: ${progressToSend}%，内容长度: ${fullContent.length}，已用时间: ${elapsedSeconds.toFixed(1)}秒`);
-                
-                // 发送进度更新
-                res.write(`data: ${JSON.stringify({
-                  type: 'content',
-                  content: `>进度 **${progressToSend}%**`
-                })}\n\n`);
-                
-                lastProgressSent = progressToSend;
-                lastProgressTime = Date.now();
-              }
+            // 每10个数据块打印一次进度
+            if (chunkCount % 10 === 0) {
+              const elapsedSeconds = (Date.now() - startTime) / 1000;
+              console.log(`[${new Date().toISOString()}] 已接收 ${chunkCount} 个数据块，内容长度: ${fullContent.length}，已用时间: ${elapsedSeconds.toFixed(1)}秒`);
             }
           }
         }
-        
-        // 发送接近完成的进度
-        res.write(`data: ${JSON.stringify({
-          type: 'content',
-          content: ">进度 **90%**"
-        })}\n\n`);
         
         const totalTime = (Date.now() - startTime) / 1000;
         console.log(`[${new Date().toISOString()}] 流式响应完成，共接收 ${chunkCount} 个数据块，总内容长度: ${fullContent.length}，总用时: ${totalTime.toFixed(1)}秒`);

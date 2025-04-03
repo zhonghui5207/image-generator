@@ -1,0 +1,10 @@
+[
+  {
+    "_id": "1",
+    "username": "admin",
+    "email": "admin@example.com",
+    "role": "super-admin",
+    "lastLogin": "2025-04-03T16:51:09.364Z",
+    "createdAt": "2025-04-03T16:51:09.364Z"
+  }
+]

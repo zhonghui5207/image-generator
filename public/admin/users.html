@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户管理 - 图像生成器管理后台</title>
+  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="admin-container">
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="logo">
+        <h2>AI 图像生成器</h2>
+        <p>管理后台</p>
+      </div>
+      
+      <ul class="nav-menu">
+        <li>
+          <a href="index.html">
+            <i class="fas fa-tachometer-alt"></i> 概览
+          </a>
+        </li>
+        <li>
+          <a href="users.html" class="active">
+            <i class="fas fa-users"></i> 用户管理
+          </a>
+        </li>
+        <li>
+          <a href="credits.html">
+            <i class="fas fa-coins"></i> 积分管理
+          </a>
+        </li>
+        <li>
+          <a href="orders.html">
+            <i class="fas fa-shopping-cart"></i> 订单管理
+          </a>
+        </li>
+        <li>
+          <a href="images.html">
+            <i class="fas fa-images"></i> 图像管理
+          </a>
+        </li>
+        <li>
+          <a href="payments.html">
+            <i class="fas fa-credit-card"></i> 支付配置
+          </a>
+        </li>
+        <li>
+          <a href="settings.html">
+            <i class="fas fa-cog"></i> 系统设置
+          </a>
+        </li>
+      </ul>
+    </aside>
+    
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- 顶部导航 -->
+      <header class="header">
+        <button class="toggle-sidebar" id="toggle-sidebar">
+          <i class="fas fa-bars"></i>
+        </button>
+        
+        <div class="header-title">
+          <h2>用户管理</h2>
+        </div>
+        
+        <div class="user-menu">
+          <button class="user-menu-btn" id="user-menu-btn">
+            <span id="admin-username">管理员</span>
+            <i class="fas fa-chevron-down"></i>
+          </button>
+          
+          <div class="user-dropdown" id="user-dropdown">
+            <a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 退出登录</a>
+          </div>
+        </div>
+      </header>
+      
+      <!-- 用户过滤和搜索 -->
+      <div class="filter-container">
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="搜索用户名、邮箱或手机...">
+          <button id="searchBtn"><i class="fas fa-search"></i></button>
+        </div>
+        <div class="filter-options">
+          <select id="statusFilter">
+            <option value="">所有状态</option>
+            <option value="active">已激活</option>
+            <option value="inactive">未激活</option>
+            <option value="banned">已封禁</option>
+          </select>
+          <button id="addUserBtn" class="btn btn-primary"><i class="fas fa-plus"></i> 添加用户</button>
+        </div>
+      </div>
+      
+      <!-- 用户列表 -->
+      <div class="table-container">
+        <table id="usersTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>用户名</th>
+              <th>邮箱</th>
+              <th>手机</th>
+              <th>积分余额</th>
+              <th>注册时间</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody">
+            <!-- 用户数据将在这里动态加载 -->
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- 分页 -->
+      <div id="paginationContainer" class="pagination-container">
+        <!-- 分页内容将在这里动态生成 -->
+      </div>
+    </main>
+  </div>
+  
+  <script src="js/admin.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // 验证登录状态
+      if (!adminUtils.checkAdminAuth()) return;
+      
+      // 初始化变量
+      let currentPage = 1;
+      let totalPages = 1;
+      const PAGE_SIZE = 10;
+      let searchTerm = '';
+      let statusFilter = '';
+      
+      // 获取元素
+      const searchInput = document.getElementById('searchInput');
+      const searchBtn = document.getElementById('searchBtn');
+      const statusFilterSelect = document.getElementById('statusFilter');
+      const usersTableBody = document.getElementById('usersTableBody');
+      const paginationContainer = document.getElementById('paginationContainer');
+      const addUserBtn = document.getElementById('addUserBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      
+      // 加载用户数据
+      async function loadUsers() {
+        try {
+          const params = new URLSearchParams({
+            page: currentPage,
+            limit: PAGE_SIZE,
+            status: statusFilter
+          });
+          
+          if (searchTerm) {
+            params.append('search', searchTerm);
+          }
+          
+          const response = await adminUtils.apiRequest(`/api/admin/users?${params.toString()}`);
+          
+          if (response && response.success) {
+            // 更新分页信息
+            totalPages = Math.ceil(response.total / PAGE_SIZE);
+            renderPagination();
+            
+            // 渲染用户列表
+            renderUserList(response.users);
+          } else {
+            adminUtils.showNotification(response.message || '加载用户数据失败', 'error');
+          }
+        } catch (error) {
+          adminUtils.showNotification('加载用户数据时发生错误', 'error');
+          console.error('加载用户数据错误:', error);
+        }
+      }
+      
+      // 渲染用户列表
+      function renderUserList(users) {
+        // 清空表格
+        usersTableBody.innerHTML = '';
+        
+        if (!users || users.length === 0) {
+          const emptyRow = document.createElement('tr');
+          const emptyCell = document.createElement('td');
+          emptyCell.colSpan = 8;
+          emptyCell.textContent = '没有找到用户数据';
+          emptyCell.className = 'empty-table-message';
+          emptyRow.appendChild(emptyCell);
+          usersTableBody.appendChild(emptyRow);
+          return;
+        }
+        
+        // 添加用户行
+        users.forEach(user => {
+          const row = document.createElement('tr');
+          
+          // 用户ID
+          const idCell = document.createElement('td');
+          idCell.textContent = user._id;
+          row.appendChild(idCell);
+          
+          // 用户名
+          const usernameCell = document.createElement('td');
+          usernameCell.textContent = user.username;
+          row.appendChild(usernameCell);
+          
+          // 邮箱
+          const emailCell = document.createElement('td');
+          emailCell.textContent = user.email || '-';
+          row.appendChild(emailCell);
+          
+          // 手机
+          const phoneCell = document.createElement('td');
+          phoneCell.textContent = user.phone || '-';
+          row.appendChild(phoneCell);
+          
+          // 积分余额
+          const creditsCell = document.createElement('td');
+          creditsCell.textContent = user.credits || 0;
+          row.appendChild(creditsCell);
+          
+          // 注册时间
+          const createdAtCell = document.createElement('td');
+          createdAtCell.textContent = adminUtils.formatDateTime(user.createdAt);
+          row.appendChild(createdAtCell);
+          
+          // 状态
+          const statusCell = document.createElement('td');
+          const statusBadge = document.createElement('span');
+          statusBadge.className = 'badge';
+          
+          switch (user.status) {
+            case 'active':
+              statusBadge.textContent = '已激活';
+              statusBadge.classList.add('badge-success');
+              break;
+            case 'inactive':
+              statusBadge.textContent = '未激活';
+              statusBadge.classList.add('badge-warning');
+              break;
+            case 'banned':
+              statusBadge.textContent = '已封禁';
+              statusBadge.classList.add('badge-danger');
+              break;
+            default:
+              statusBadge.textContent = '未知';
+              statusBadge.classList.add('badge-secondary');
+          }
+          
+          statusCell.appendChild(statusBadge);
+          row.appendChild(statusCell);
+          
+          // 操作
+          const actionsCell = document.createElement('td');
+          actionsCell.innerHTML = `
+            <button class="btn btn-sm btn-primary edit-user" data-id="${user._id}">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-sm btn-danger delete-user" data-id="${user._id}">
+              <i class="fas fa-trash"></i>
+            </button>
+          `;
+          row.appendChild(actionsCell);
+          
+          usersTableBody.appendChild(row);
+        });
+        
+        // 添加事件监听
+        document.querySelectorAll('.edit-user').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const userId = this.getAttribute('data-id');
+            editUser(userId);
+          });
+        });
+        
+        document.querySelectorAll('.delete-user').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const userId = this.getAttribute('data-id');
+            deleteUser(userId);
+          });
+        });
+      }
+      
+      // 渲染分页
+      function renderPagination() {
+        paginationContainer.innerHTML = '';
+        
+        if (totalPages <= 1) return;
+        
+        const pagination = document.createElement('ul');
+        pagination.className = 'pagination';
+        
+        // 上一页
+        const prevLi = document.createElement('li');
+        const prevLink = document.createElement('a');
+        prevLink.href = '#';
+        prevLink.innerHTML = '&laquo;';
+        prevLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (currentPage > 1) {
+            currentPage--;
+            loadUsers();
+          }
+        });
+        
+        if (currentPage === 1) {
+          prevLi.className = 'disabled';
+        }
+        
+        prevLi.appendChild(prevLink);
+        pagination.appendChild(prevLi);
+        
+        // 页码
+        for (let i = 1; i <= totalPages; i++) {
+          const pageLi = document.createElement('li');
+          const pageLink = document.createElement('a');
+          pageLink.href = '#';
+          pageLink.textContent = i;
+          
+          if (i === currentPage) {
+            pageLi.className = 'active';
+          }
+          
+          pageLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (i !== currentPage) {
+              currentPage = i;
+              loadUsers();
+            }
+          });
+          
+          pageLi.appendChild(pageLink);
+          pagination.appendChild(pageLi);
+        }
+        
+        // 下一页
+        const nextLi = document.createElement('li');
+        const nextLink = document.createElement('a');
+        nextLink.href = '#';
+        nextLink.innerHTML = '&raquo;';
+        nextLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (currentPage < totalPages) {
+            currentPage++;
+            loadUsers();
+          }
+        });
+        
+        if (currentPage === totalPages) {
+          nextLi.className = 'disabled';
+        }
+        
+        nextLi.appendChild(nextLink);
+        pagination.appendChild(nextLi);
+        
+        paginationContainer.appendChild(pagination);
+      }
+      
+      // 搜索用户
+      function searchUsers() {
+        searchTerm = searchInput.value.trim();
+        currentPage = 1;
+        loadUsers();
+      }
+      
+      // 状态筛选
+      function filterByStatus() {
+        statusFilter = statusFilterSelect.value;
+        currentPage = 1;
+        loadUsers();
+      }
+      
+      // 编辑用户
+      async function editUser(userId) {
+        // 示例实现：在实际应用中，这里应该打开编辑模态框
+        const user = await adminUtils.apiRequest(`/api/admin/users/${userId}`);
+        if (user) {
+          adminUtils.showNotification(`准备编辑用户: ${user.username}`, 'info');
+          // 打开模态框的逻辑
+        }
+      }
+      
+      // 删除用户
+      function deleteUser(userId) {
+        if (confirm('确定要删除此用户吗？此操作不可逆。')) {
+          adminUtils.apiRequest(`/api/admin/users/${userId}`, { method: 'DELETE' })
+            .then(() => {
+              adminUtils.showNotification('用户删除成功', 'success');
+              loadUsers();
+            })
+            .catch(error => {
+              adminUtils.showNotification('删除用户失败: ' + error.message, 'error');
+            });
+        }
+      }
+      
+      // 添加用户
+      function addUser() {
+        // 示例实现：在实际应用中，这里应该打开添加用户的模态框
+        adminUtils.showNotification('打开添加用户表单', 'info');
+        // 打开模态框的逻辑
+      }
+      
+      // 事件监听
+      searchBtn.addEventListener('click', searchUsers);
+      
+      searchInput.addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') {
+          searchUsers();
+        }
+      });
+      
+      statusFilterSelect.addEventListener('change', filterByStatus);
+      
+      addUserBtn.addEventListener('click', addUser);
+      
+      // 初始加载
+      loadUsers();
+    });
+  </script>
+</body>
+</html>

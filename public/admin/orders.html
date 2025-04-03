@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>订单管理 - 图像生成器管理后台</title>
+  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="admin-container">
+    <!-- 侧边栏 -->
+        <aside class="sidebar" id="sidebar">
+            <div class="logo">
+                <h2>AI 图像生成器</h2>
+                <p>管理后台</p>
+            </div>
+            
+            <ul class="nav-menu">
+                <li>
+                    <a href="index.html" >
+                        <i class="fas fa-tachometer-alt"></i> 概览
+                    </a>
+                </li>
+                <li>
+                    <a href="users.html">
+                        <i class="fas fa-users"></i> 用户管理
+                    </a>
+                </li>
+                <li>
+                    <a href="credits.html">
+                        <i class="fas fa-coins"></i> 积分管理
+                    </a>
+                </li>
+                <li>
+                    <a href="orders.html" class="active">
+                        <i class="fas fa-shopping-cart"></i> 订单管理
+                    </a>
+                </li>
+                <li>
+                    <a href="images.html">
+                        <i class="fas fa-images"></i> 图像管理
+                    </a>
+                </li>
+                <li>
+                    <a href="payments.html">
+                        <i class="fas fa-credit-card"></i> 支付配置
+                    </a>
+                </li>
+                <li>
+                    <a href="settings.html">
+                        <i class="fas fa-cog"></i> 系统设置
+                    </a>
+                </li>
+            </ul>
+        </aside>
+    
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- 顶部导航 -->
+            <header class="header">
+                <button class="toggle-sidebar" id="toggle-sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+                
+                <div class="header-title">
+                    <h2>订单管理</h2>
+                </div>
+                
+                <div class="user-menu">
+                    <button class="user-menu-btn" id="user-menu-btn">
+                        <span id="admin-username">管理员</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    
+                    <div class="user-dropdown" id="user-dropdown">
+                        <a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 退出登录</a>
+                    </div>
+                </div>
+            </header>
+      
+      
+    </main>
+  </div>
+  
+  <script src="js/admin.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // 验证登录状态
+      if (!adminUtils.checkAdminAuth()) return;
+      
+      // 初始化变量
+      let currentPage = 1;
+      let totalPages = 1;
+      const PAGE_SIZE = 10;
+      let searchTerm = '';
+      let statusFilter = '';
+      let paymentMethodFilter = '';
+      let startDate = '';
+      let endDate = '';
+      
+      // 获取元素
+      const searchInput = document.getElementById('searchInput');
+      const searchBtn = document.getElementById('searchBtn');
+      const statusFilterSelect = document.getElementById('statusFilter');
+      const paymentMethodFilterSelect = document.getElementById('paymentMethodFilter');
+      const startDateInput = document.getElementById('startDate');
+      const endDateInput = document.getElementById('endDate');
+      const filterBtn = document.getElementById('filterBtn');
+      const ordersTableBody = document.getElementById('ordersTableBody');
+      const paginationContainer = document.getElementById('paginationContainer');
+      const logoutBtn = document.getElementById('logoutBtn');
+      
+      const todayOrderCountEl = document.getElementById('todayOrderCount');
+      const todayRevenueEl = document.getElementById('todayRevenue');
+      const monthOrderCountEl = document.getElementById('monthOrderCount');
+      const monthRevenueEl = document.getElementById('monthRevenue');
+      
+      // 加载订单统计数据
+      async function loadOrderStats() {
+        try {
+          const response = await adminUtils.apiRequest('/api/admin/orders/stats');
+          
+          if (response && response.success) {
+            todayOrderCountEl.textContent = response.stats.todayCount;
+            todayRevenueEl.textContent = adminUtils.formatCurrency(response.stats.todayRevenue);
+            monthOrderCountEl.textContent = response.stats.monthCount;
+            monthRevenueEl.textContent = adminUtils.formatCurrency(response.stats.monthRevenue);
+          } else {
+            adminUtils.showAlert(response.message || '加载订单统计数据失败', 'error');
+          }
+        } catch (error) {
+          adminUtils.showAlert('加载订单统计数据时发生错误', 'error');
+          console.error('加载订单统计数据错误:', error);
+        }
+      }
+      
+      // 加载订单列表
+      async function loadOrders() {
+        try {
+          const params = new URLSearchParams({
+            page: currentPage,
+            limit: PAGE_SIZE,
+            status: statusFilter,
+            paymentMethod: paymentMethodFilter
+          });
+          
+          if (searchTerm) {
+            params.append('search', searchTerm);
+          }
+          
+          if (startDate) {
+            params.append('startDate', startDate);
+          }
+          
+          if (endDate) {
+            params.append('endDate', endDate);
+          }
+          
+          const response = await adminUtils.apiRequest(`/api/admin/orders?${params.toString()}`);
+          
+          if (response && response.success) {
+            // 更新分页信息
+            totalPages = Math.ceil(response.total / PAGE_SIZE);
+            renderPagination();
+            
+            // 渲染订单列表
+            renderOrderList(response.orders);
+          } else {
+            adminUtils.showAlert(response.message || '加载订单数据失败', 'error');
+          }
+        } catch (error) {
+          adminUtils.showAlert('加载订单数据时发生错误', 'error');
+          console.error('加载订单数据错误:', error);
+        }
+      }
+      
+      // 渲染订单列表
+      function renderOrderList(orders) {
+        // 清空表格
+        ordersTableBody.innerHTML = '';
+        
+        if (orders.length === 0) {
+          const emptyRow = document.createElement('tr');
+          const emptyCell = document.createElement('td');
+          emptyCell.colSpan = 9;
+          emptyCell.textContent = '没有找到订单数据';
+          emptyCell.className = 'empty-table-message';
+          emptyRow.appendChild(emptyCell);
+          ordersTableBody.appendChild(emptyRow);
+          return;
+        }
+        
+        // 添加订单行
+        orders.forEach(order => {
+          const row = document.createElement('tr');
+          
+          // 订单号
+          const orderIdCell = document.createElement('td');
+          orderIdCell.textContent = order.orderNumber;
+          row.appendChild(orderIdCell);
+          
+          // 用户
+          const userCell = document.createElement('td');
+          userCell.textContent = order.user ? order.user.username : '未知用户';
+          row.appendChild(userCell);
+          
+          // 商品
+          const productCell = document.createElement('td');
+          productCell.textContent = order.productName || '积分充值';
+          row.appendChild(productCell);
+          
+          // 金额
+          const amountCell = document.createElement('td');
+          amountCell.textContent = adminUtils.formatCurrency(order.amount);
+          row.appendChild(amountCell);
+          
+          // 积分
+          const creditsCell = document.createElement('td');
+          creditsCell.textContent = order.credits;
+          row.appendChild(creditsCell);
+          
+          // 支付方式
+          const paymentMethodCell = document.createElement('td');
+          
+          switch (order.paymentMethod) {
+            case 'wechat':
+              paymentMethodCell.textContent = '微信支付';
+              break;
+            case 'alipay':
+              paymentMethodCell.textContent = '支付宝';
+              break;
+            case 'payjs':
+              paymentMethodCell.textContent = 'PayJS';
+              break;
+            case 'manual':
+              paymentMethodCell.textContent = '手动充值';
+              break;
+            default:
+              paymentMethodCell.textContent = order.paymentMethod || '未知';
+          }
+          
+          row.appendChild(paymentMethodCell);
+          
+          // 状态
+          const statusCell = document.createElement('td');
+          const statusBadge = document.createElement('span');
+          statusBadge.className = 'badge';
+          
+          switch (order.status) {
+            case 'pending':
+              statusBadge.textContent = '待支付';
+              statusBadge.classList.add('badge-warning');
+              break;
+            case 'paid':
+              statusBadge.textContent = '已支付';
+              statusBadge.classList.add('badge-success');
+              break;
+            case 'cancelled':
+              statusBadge.textContent = '已取消';
+              statusBadge.classList.add('badge-secondary');
+              break;
+            case 'refunded':
+              statusBadge.textContent = '已退款';
+              statusBadge.classList.add('badge-danger');
+              break;
+            default:
+              statusBadge.textContent = order.status || '未知';
+              statusBadge.classList.add('badge-secondary');
+          }
+          
+          statusCell.appendChild(statusBadge);
+          row.appendChild(statusCell);
+          
+          // 创建时间
+          const createdAtCell = document.createElement('td');
+          createdAtCell.textContent = adminUtils.formatDateTime(order.createdAt);
+          row.appendChild(createdAtCell);
+          
+          // 操作
+          const actionsCell = document.createElement('td');
+          actionsCell.className = 'actions-cell';
+          
+          // 查看详情按钮
+          const viewBtn = document.createElement('button');
+          viewBtn.className = 'btn btn-sm btn-primary';
+          viewBtn.innerHTML = '<i class="fas fa-eye"></i>';
+          viewBtn.title = '查看详情';
+          viewBtn.addEventListener('click', () => viewOrderDetails(order._id));
+          actionsCell.appendChild(viewBtn);
+          
+          // 根据订单状态显示不同的操作按钮
+          if (order.status === 'pending') {
+            // 手动标记为已支付按钮
+            const markPaidBtn = document.createElement('button');
+            markPaidBtn.className = 'btn btn-sm btn-success';
+            markPaidBtn.innerHTML = '<i class="fas fa-check"></i>';
+            markPaidBtn.title = '标记为已支付';
+            markPaidBtn.addEventListener('click', () => updateOrderStatus(order._id, 'paid'));
+            actionsCell.appendChild(markPaidBtn);
+            
+            // 取消订单按钮
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'btn btn-sm btn-danger';
+            cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
+            cancelBtn.title = '取消订单';
+            cancelBtn.addEventListener('click', () => updateOrderStatus(order._id, 'cancelled'));
+            actionsCell.appendChild(cancelBtn);
+          } else if (order.status === 'paid') {
+            // 退款按钮
+            const refundBtn = document.createElement('button');
+            refundBtn.className = 'btn btn-sm btn-warning';
+            refundBtn.innerHTML = '<i class="fas fa-undo"></i>';
+            refundBtn.title = '退款';
+            refundBtn.addEventListener('click', () => processRefund(order._id));
+            actionsCell.appendChild(refundBtn);
+          }
+          
+          row.appendChild(actionsCell);
+          ordersTableBody.appendChild(row);
+        });
+      }
+      
+      // 渲染分页
+      function renderPagination() {
+        // 清空分页容器
+        paginationContainer.innerHTML = '';
+        
+        if (totalPages <= 1) return;
+        
+        // 创建分页
+        const pagination = adminUtils.createPagination(currentPage, totalPages, (page) => {
+          currentPage = page;
+          loadOrders();
+        });
+        
+        paginationContainer.appendChild(pagination);
+      }
+      
+      // 查看订单详情
+      async function viewOrderDetails(orderId) {
+        try {
+          const response = await adminUtils.apiRequest(`/api/admin/orders/${orderId}`);
+          
+          if (response && response.success) {
+            // 创建详情模态框显示订单详细信息
+            const order = response.order;
+            
+            const detailsHtml = `
+              <div class="order-details">
+                <div class="details-row">
+                  <div class="details-label">订单号：</div>
+                  <div class="details-value">${order.orderNumber}</div>
+                </div>
+                <div class="details-row">
+                  <div class="details-label">用户：</div>
+                  <div class="details-value">${order.user ? order.user.username : '未知用户'}</div>
+                </div>
+                <div class="details-row">
+                  <div class="details-label">商品：</div>
+                  <div class="details-value">${order.productName || '积分充值'}</div>
+                </div>
+                <div class="details-row">
+                  <div class="details-label">金额：</div>
+                  <div class="details-value">${adminUtils.formatCurrency(order.amount)}</div>
+                </div>
+                <div class="details-row">
+                  <div class="details-label">积分：</div>
+                  <div class="details-value">${order.credits}</div>
+                </div>
+                <div class="details-row">
+                  <div class="details-label">支付方式：</div>
+                  <div class="details-value">${getPaymentMethodText(order.paymentMethod)}</div>
+                </div>
+                <div class="details-row">
+                  <div class="details-label">状态：</div>
+                  <div class="details-value">${getStatusText(order.status)}</div>
+                </div>
+                <div class="details-row">
+                  <div class="details-label">创建时间：</div>
+                  <div class="details-value">${adminUtils.formatDateTime(order.createdAt)}</div>
+                </div>
+                ${order.paidAt ? `
+                <div class="details-row">
+                  <div class="details-label">支付时间：</div>
+                  <div class="details-value">${adminUtils.formatDateTime(order.paidAt)}</div>
+                </div>
+                ` : ''}
+                ${order.transactionId ? `
+                <div class="details-row">
+                  <div class="details-label">交易ID：</div>
+                  <div class="details-value">${order.transactionId}</div>
+                </div>
+                ` : ''}
+                ${order.refundReason ? `
+                <div class="details-row">
+                  <div class="details-label">退款原因：</div>
+                  <div class="details-value">${order.refundReason}</div>
+                </div>
+                ` : ''}
+                ${order.notes ? `
+                <div class="details-row">
+                  <div class="details-label">备注：</div>
+                  <div class="details-value">${order.notes}</div>
+                </div>
+                ` : ''}
+              </div>
+            `;
+            
+            // 创建模态框
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'flex';
+            
+            // 创建模态框内容
+            const modalContent = document.createElement('div');
+            modalContent.className = 'modal-content';
+            
+            // 创建模态框头部
+            const modalHeader = document.createElement('div');
+            modalHeader.className = 'modal-header';
+            
+            const modalTitle = document.createElement('h3');
+            modalTitle.className = 'modal-title';
+            modalTitle.textContent = '订单详情';
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'modal-close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.addEventListener('click', () => {
+              modal.remove();
+            });
+            
+            modalHeader.appendChild(modalTitle);
+            modalHeader.appendChild(closeBtn);
+            
+            // 创建模态框主体
+            const modalBody = document.createElement('div');
+            modalBody.className = 'modal-body';
+            modalBody.innerHTML = detailsHtml;
+            
+            // 组装模态框
+            modalContent.appendChild(modalHeader);
+            modalContent.appendChild(modalBody);
+            modal.appendChild(modalContent);
+            
+            // 添加到文档
+            document.body.appendChild(modal);
+            
+            // 点击模态框外部关闭
+            modal.addEventListener('click', (e) => {
+              if (e.target === modal) {
+                modal.remove();
+              }
+            });
+          } else {
+            adminUtils.showAlert(response.message || '获取订单详情失败', 'error');
+          }
+        } catch (error) {
+          adminUtils.showAlert('获取订单详情时发生错误', 'error');
+          console.error('获取订单详情错误:', error);
+        }
+      }
+      
+      // 更新订单状态
+      function updateOrderStatus(orderId, newStatus) {
+        const statusText = getStatusActionText(newStatus);
+        
+        adminUtils.createConfirmDialog(
+          `确定要将此订单${statusText}吗？`,
+          async () => {
+            try {
+              const response = await adminUtils.apiRequest(`/api/admin/orders/${orderId}/status`, 'PUT', { status: newStatus });
+              
+              if (response && response.success) {
+                adminUtils.showAlert(`订单已成功${statusText}`);
+                loadOrders();
+                loadOrderStats();
+              } else {
+                adminUtils.showAlert(response.message || `${statusText}订单失败`, 'error');
+              }
+            } catch (error) {
+              adminUtils.showAlert(`${statusText}订单时发生错误`, 'error');
+              console.error(`${statusText}订单错误:`, error);
+            }
+          }
+        );
+      }
+      
+      // 处理退款
+      function processRefund(orderId) {
+        const fields = [
+          {
+            id: 'reason',
+            label: '退款原因',
+            type: 'textarea',
+            required: true,
+            rows: 3
+          }
+        ];
+        
+        adminUtils.createFormDialog(
+          '处理退款',
+          fields,
+          async (formData, closeModal) => {
+            try {
+              const response = await adminUtils.apiRequest(`/api/admin/orders/${orderId}/refund`, 'POST', formData);
+              
+              if (response && response.success) {
+                adminUtils.showAlert('退款处理成功');
+                loadOrders();
+                loadOrderStats();
+                closeModal();
+              } else {
+                adminUtils.showAlert(response.message || '退款处理失败', 'error');
+              }
+            } catch (error) {
+              adminUtils.showAlert('退款处理时发生错误', 'error');
+              console.error('退款处理错误:', error);
+            }
+          }
+        );
+      }
+      
+      // 获取支付方式显示文本
+      function getPaymentMethodText(method) {
+        switch (method) {
+          case 'wechat': return '微信支付';
+          case 'alipay': return '支付宝';
+          case 'payjs': return 'PayJS';
+          case 'manual': return '手动充值';
+          default: return method || '未知';
+        }
+      }
+      
+      // 获取状态显示文本
+      function getStatusText(status) {
+        switch (status) {
+          case 'pending': return '待支付';
+          case 'paid': return '已支付';
+          case 'cancelled': return '已取消';
+          case 'refunded': return '已退款';
+          default: return status || '未知';
+        }
+      }
+      
+      // 获取状态操作文本
+      function getStatusActionText(status) {
+        switch (status) {
+          case 'paid': return '标记为已支付';
+          case 'cancelled': return '取消';
+          case 'refunded': return '退款';
+          default: return '更新状态';
+        }
+      }
+      
+      // 搜索订单
+      function searchOrders() {
+        searchTerm = searchInput.value.trim();
+        currentPage = 1;
+        loadOrders();
+      }
+      
+      // 过滤订单
+      function filterOrders() {
+        statusFilter = statusFilterSelect.value;
+        paymentMethodFilter = paymentMethodFilterSelect.value;
+        startDate = startDateInput.value;
+        endDate = endDateInput.value;
+        currentPage = 1;
+        loadOrders();
+      }
+      
+      // 退出登录
+      function logout() {
+        localStorage.removeItem('adminToken');
+        window.location.href = '/admin/login.html';
+      }
+      
+      // 事件监听
+      searchBtn.addEventListener('click', searchOrders);
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchOrders();
+      });
+      filterBtn.addEventListener('click', filterOrders);
+      logoutBtn.addEventListener('click', logout);
+      
+      // 显示用户下拉菜单
+      const dropdownBtn = document.querySelector('.dropdown-btn');
+      dropdownBtn.addEventListener('click', function() {
+        document.querySelector('.dropdown-content').classList.toggle('show');
+      });
+      
+      // 点击其他地方关闭下拉菜单
+      window.addEventListener('click', function(e) {
+        if (!e.target.matches('.dropdown-btn') && !e.target.matches('.fa-chevron-down')) {
+          const dropdowns = document.querySelectorAll('.dropdown-content');
+          dropdowns.forEach(dropdown => {
+            if (dropdown.classList.contains('show')) {
+              dropdown.classList.remove('show');
+            }
+          });
+        }
+      });
+      
+      // 设置默认日期范围（最近30天）
+      const today = new Date();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      
+      endDateInput.valueAsDate = today;
+      startDateInput.valueAsDate = thirtyDaysAgo;
+      
+      // 初始加载
+      loadOrderStats();
+      loadOrders();
+    });
+  </script>
+</body>
