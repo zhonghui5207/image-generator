@@ -15,65 +15,26 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    align-items: flex-start;
-    padding: 20px;
+    align-items: stretch;
     margin-bottom: 30px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    gap: 20px;
 }
 
-/* 用户头像部分 */
-.user-avatar-section {
+/* 用户信息部分 */
+.user-info-section {
     display: flex;
-    align-items: center;
-    margin-bottom: 20px;
-    width: 100%;
-}
-
-.avatar-container {
-    position: relative;
-    width: 100px;
-    height: 100px;
-    margin-right: 20px;
-}
-
-#user-avatar {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid #fff;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-.avatar-edit {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    background-color: #4a6cf7;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.avatar-edit i {
-    color: white;
-    font-size: 14px;
-}
-
-.avatar-edit:hover {
-    background-color: #3a5bd9;
+    flex-direction: column;
+    flex: 2;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    padding: 25px;
 }
 
 .user-name-display {
     display: flex;
     flex-direction: column;
+    margin-bottom: 15px;
 }
 
 .user-name-display h2 {
@@ -89,12 +50,12 @@
     padding: 3px 10px;
     border-radius: 12px;
     display: inline-block;
+    width: fit-content;
 }
 
 /* 用户信息部分 */
 .user-info {
-    flex: 2;
-    padding-right: 20px;
+    margin-top: 10px;
 }
 
 .user-details {
@@ -120,39 +81,48 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 15px;
-    background-color: #fff;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    min-width: 150px;
+    padding: 25px;
+    background: linear-gradient(135deg, #4a6cf7 0%, #3a5bd9 100%);
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(74, 108, 247, 0.3);
+    color: white;
+    min-width: 250px;
 }
 
 .credits-amount {
-    font-size: 36px;
+    font-size: 48px;
     font-weight: bold;
-    color: #4a6cf7;
-    margin-bottom: 5px;
+    color: #fff;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .credits-label {
-    font-size: 14px;
-    color: #666;
-    margin-bottom: 15px;
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 20px;
+    font-weight: 500;
 }
 
 .buy-credits-link {
     display: inline-block;
-    padding: 8px 15px;
-    background-color: #4a6cf7;
+    padding: 10px 20px;
+    background-color: rgba(255, 255, 255, 0.2);
     color: white;
-    border-radius: 4px;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    border-radius: 30px;
     text-decoration: none;
-    font-size: 14px;
-    transition: background-color 0.3s;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .buy-credits-link:hover {
-    background-color: #3a5bd9;
+    background-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 /* 标签页样式 */

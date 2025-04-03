@@ -129,10 +129,15 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
     
     // 检查用户积分是否足够
     if (req.user.credits < creditsToUse) {
-      return res.status(402).json({ 
-        success: false, 
+      // 返回状态码200和特殊标志，以便前端能够识别并正确处理
+      return res.status(200).json({ 
+        success: true, 
+        insufficientCredits: true,
         message: '积分不足，请充值',
-        creditsNeeded: creditsToUse - req.user.credits
+        currentCredits: req.user.credits,
+        requiredCredits: creditsToUse,
+        creditsNeeded: creditsToUse - req.user.credits,
+        modelName: selectedModel
       });
     }
 

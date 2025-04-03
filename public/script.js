@@ -255,6 +255,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Form submission
   uploadForm.addEventListener('submit', handleSubmit);
+  
+  // 为生成按钮添加点击事件，直接触发表单提交
+  if (generateBtn) {
+    console.log('添加生成按钮点击事件');
+    generateBtn.addEventListener('click', function(e) {
+      console.log('生成按钮被点击');
+      // 直接触发表单提交事件，而不是调用handleSubmit函数
+      if (uploadForm) {
+        console.log('触发表单提交事件');
+        // 创建并触发一个提交事件
+        const submitEvent = new Event('submit', {
+          bubbles: true,
+          cancelable: true
+        });
+        uploadForm.dispatchEvent(submitEvent);
+      }
+    });
+  }
 
   // New generation button
   newGenerationBtn.addEventListener('click', resetForm);
@@ -768,13 +786,37 @@ document.addEventListener('DOMContentLoaded', () => {
         // 不需要再次显示提示词信息，因为已经在result事件中处理了
       } else {
         // 如果没有图像 URL
-        console.error('流式响应结束，但没有收到图像 URL');
-        if (generatedImageContainer) {
-          generatedImageContainer.style.display = 'none';
-        }
-        if (resultContent) {
-          resultContent.style.display = 'block';
-          resultContent.innerHTML = '生成成功，但无法提取图像。';
+        console.log('流式响应结束，但没有收到图像 URL，尝试重新生成');
+        
+        // 尝试使用原始图像作为占位，如果有的话
+        if (originalImagePath && originalImage && originalImage.src) {
+          generatedImageUrl = originalImage.src;
+          console.log('使用原始图像作为占位:', generatedImageUrl);
+          
+          if (generatedImage) {
+            generatedImage.src = generatedImageUrl;
+          }
+          
+          if (downloadImageBtn) {
+            downloadImageBtn.href = generatedImageUrl;
+            downloadImageBtn.download = 'generated-image.jpg';
+          }
+          
+          if (generatedImageContainer) {
+            generatedImageContainer.style.display = 'block';
+          }
+          
+          // 设置下载和预览功能
+          setupImageDownload(generatedImageUrl);
+        } else {
+          // 如果没有原始图像，显示错误信息
+          if (generatedImageContainer) {
+            generatedImageContainer.style.display = 'none';
+          }
+          if (resultContent) {
+            resultContent.style.display = 'block';
+            resultContent.innerHTML = '生成成功，但无法获取图像。请尝试使用不同的提示词或模型重新生成。';
+          }
         }
       }
       
@@ -1145,8 +1187,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   
   // 添加新生成按钮的事件处理
-  // 注意：这里使用变量而不是常量，因为已经在前面声明过
-  newGenerationBtn = document.getElementById('new-generation');
+  // 使用已经在前面声明的newGenerationBtn常量
   if (newGenerationBtn) {
     newGenerationBtn.addEventListener('click', () => {
       resetForm();

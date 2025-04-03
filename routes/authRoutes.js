@@ -124,6 +124,17 @@ router.get('/me', authenticate, async (req, res) => {
 router.get('/profile', authenticate, async (req, res) => {
   try {
     console.log('收到获取用户信息请求，用户ID:', req.user._id);
+    
+    // 从数据库中获取生成次数
+    let generationCount = 0;
+    
+    // 导入GeneratedImage模型
+    const GeneratedImage = (await import('../models/GeneratedImage.js')).default;
+    
+    // 查询用户的生成历史记录数量
+    generationCount = await GeneratedImage.countDocuments({ user: req.user._id });
+    console.log('用户生成次数:', generationCount);
+    
     res.json({
       success: true,
       user: {
@@ -133,7 +144,8 @@ router.get('/profile', authenticate, async (req, res) => {
         credits: req.user.credits,
         isAdmin: req.user.isAdmin,
         createdAt: req.user.createdAt
-      }
+      },
+      generationCount: generationCount // 返回生成次数
     });
   } catch (error) {
     console.error('获取用户信息错误:', error);

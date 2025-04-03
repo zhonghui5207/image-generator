@@ -65,7 +65,7 @@
 
 .credits-info {
   width: 100%;
-  text-align: center;
+  text-align: left;
   color: var(--secondary-color);
 }
 
@@ -74,6 +74,29 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  margin-bottom: 8px;
+}
+
+.credits-usage-list {
+  list-style: none;
+  padding-left: 10px;
+  margin-top: 5px;
+}
+
+.credits-usage-list li {
+  padding: 4px 0;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+}
+
+.credits-usage-list li:before {
+  content: '•';
+  color: var(--primary-color);
+  font-weight: bold;
+  display: inline-block;
+  width: 1em;
+  margin-right: 5px;
 }
 
 /* 套餐选择样式 */

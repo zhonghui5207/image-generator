@@ -237,12 +237,21 @@ document.addEventListener('DOMContentLoaded', function() {
         const historyItem = document.createElement('div');
         historyItem.className = 'history-item';
         
+        // 判断是否为文生图模式
+        const isTextToImage = image.mode === 'text-to-image';
+        
         // 格式化日期
         const date = new Date(image.createdAt).toLocaleDateString();
+        
+        // 根据模式添加不同的标识
+        const modeLabel = isTextToImage ? 
+          '<div class="mode-label text-mode"><i class="fas fa-font"></i> 文生图</div>' : 
+          '<div class="mode-label image-mode"><i class="fas fa-image"></i> 图生图</div>';
         
         historyItem.innerHTML = `
           <div class="history-image">
             <img src="${image.generatedImage}" alt="生成图像">
+            ${modeLabel}
           </div>
           <div class="history-details">
             <div class="history-date">${date}</div>
@@ -255,6 +264,31 @@ document.addEventListener('DOMContentLoaded', function() {
         
         historyGrid.appendChild(historyItem);
       });
+      
+      // 添加模式标签的样式
+      const style = document.createElement('style');
+      style.textContent = `
+        .mode-label {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 12px;
+          color: white;
+          background-color: rgba(0, 0, 0, 0.6);
+        }
+        .text-mode {
+          background-color: rgba(75, 0, 130, 0.7);
+        }
+        .image-mode {
+          background-color: rgba(0, 100, 150, 0.7);
+        }
+        .history-image {
+          position: relative;
+        }
+      `;
+      document.head.appendChild(style);
     } else {
       historyGrid.innerHTML = '<div class="empty-history">暂无生成历史</div>';
     }
@@ -324,6 +358,23 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!image) return;
     
     try {
+      // 根据图像模式调整显示内容
+      const isTextToImage = image.mode === 'text-to-image';
+      
+      // 获取原始图像容器和标题
+      const originalImageContainer = document.querySelector('.original-image');
+      
+      // 根据模式显示或隐藏原始图像部分
+      if (originalImageContainer) {
+        originalImageContainer.style.display = isTextToImage ? 'none' : 'block';
+      }
+      
+      // 调整生成图像的宽度
+      const generatedImageContainer = document.querySelector('.generated-image');
+      if (generatedImageContainer) {
+        generatedImageContainer.style.width = isTextToImage ? '100%' : '50%';
+      }
+      
       // 填充模态框内容
       if (modalOriginalImage) modalOriginalImage.src = image.originalImage || '';
       if (modalGeneratedImage) modalGeneratedImage.src = image.generatedImage || '';
@@ -331,7 +382,11 @@ document.addEventListener('DOMContentLoaded', function() {
       if (modalCreditsUsed) modalCreditsUsed.textContent = image.creditsUsed || '1';
       
       // 设置使用模型
-      if (modalModelUsed) modalModelUsed.textContent = image.model || 'gpt-4-vision-preview';
+      // 根据模型值显示友好的模型名称
+      if (modalModelUsed) {
+        const modelName = getModelDisplayName(image.model || 'gpt-4o-image');
+        modalModelUsed.textContent = modelName;
+      }
       
       // 格式化日期
       if (modalCreatedAt && image.createdAt) {
@@ -505,10 +560,13 @@ document.addEventListener('DOMContentLoaded', function() {
       const item = document.createElement('div');
       item.className = 'transaction-item';
       
+      // 提取模型名称和实际消耗的积分
+      let creditsUsed = Math.abs(record.amount);
+      
       item.innerHTML = `
         <div class="transaction-date">${date}</div>
         <div class="transaction-details">${record.description || '生成图像'}</div>
-        <div class="transaction-amount negative">-${Math.abs(record.amount)} 积分</div>
+        <div class="transaction-amount negative">-${creditsUsed} 积分</div>
       `;
       
       usageList.appendChild(item);
@@ -519,10 +577,27 @@ document.addEventListener('DOMContentLoaded', function() {
   function displayMockUsageRecords() {
     if (!usageList) return;
     
-    // 模拟使用记录
+    // 生成当前时间和近期时间
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    
+    // 格式化时间
+    const formatDate = (date) => {
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    };
+    
+    // 模拟使用记录 - 根据不同模型设置正确的积分消耗
     const mockUsageRecords = [
-      { date: '2025/4/2 11:03:05', description: '生成图像 (gpt-4o-image)', amount: 1 },
-      { date: '2025/4/2 10:54:00', description: '生成图像 (gpt-4-vision-preview)', amount: 1 }
+      { date: formatDate(now), description: '生成图像 (标准模式)', amount: 4 },
+      { date: formatDate(fiveMinutesAgo), description: '生成图像 (高级模式)', amount: 5 }
     ];
     
     // 清空现有内容
@@ -533,14 +608,33 @@ document.addEventListener('DOMContentLoaded', function() {
       const item = document.createElement('div');
       item.className = 'transaction-item';
       
+      // 根据模型名称确定消耗的积分
+      let creditsUsed = record.amount;
+      
       item.innerHTML = `
         <div class="transaction-date">${record.date}</div>
         <div class="transaction-details">${record.description}</div>
-        <div class="transaction-amount negative">-${record.amount} 积分</div>
+        <div class="transaction-amount negative">-${creditsUsed} 积分</div>
       `;
       
       usageList.appendChild(item);
     });
+  }
+  
+  // 获取模型的友好显示名称
+  function getModelDisplayName(modelValue) {
+    switch (modelValue) {
+      case 'gpt-4o-image':
+        return '标准模式';
+      case 'gpt-4o-all':
+        return '高级模式';
+      case 'gpt-4o-image-vip':
+        return '专业模式';
+      case 'gpt-4-vision-preview':
+        return '旧版模式';
+      default:
+        return modelValue; // 如果没有匹配到，返回原始值
+    }
   }
   
   // 退出登录按钮
