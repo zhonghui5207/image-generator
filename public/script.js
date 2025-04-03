@@ -373,6 +373,21 @@ document.addEventListener('DOMContentLoaded', () => {
     checkFormValidity();
   }
 
+  // 添加一个简易的防抖函数辅助平滑进度更新
+  function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+      const context = this;
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(context, args), wait);
+    };
+  }
+
+  // 创建一个经过防抖处理的进度更新函数
+  const debouncedProgressUpdate = debounce((progress, value) => {
+    progress.update(value);
+  }, 300); // 300ms 的防抖延迟
+  
   // Functions for loading progress
   function updateProgress(percent, statusText, estimatedTime) {
     const progressBar = document.getElementById('progress-bar');
@@ -383,7 +398,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 对百分比进行取整，避免小数
     const roundedPercent = Math.round(percent);
     
-    if (progressBar) progressBar.style.width = `${roundedPercent}%`;
+    if (progressBar) {
+      // 确保 CSS 过渡效果生效
+      progressBar.style.transition = 'width 0.8s ease-in-out';
+      progressBar.style.width = `${roundedPercent}%`;
+    }
+    
     if (progressText) progressText.textContent = `${roundedPercent}%`;
     if (loadingStatus && statusText) loadingStatus.textContent = statusText;
     
@@ -405,12 +425,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let startTime = Date.now();
     const totalEstimatedTime = 60; // 默认估计生成需要60秒
     let remainingTime = totalEstimatedTime;
+    let lastUpdateTime = Date.now();
+    let lastProgressValue = 0;
     
     return {
       start: function() {
         startTime = Date.now();
+        lastUpdateTime = Date.now();
         // 从5%开始，慢慢增加
         progressValue = 5;
+        lastProgressValue = progressValue;
         updateProgress(progressValue, '初始化中...', remainingTime);
         
         intervalId = setInterval(() => {
@@ -429,19 +453,19 @@ document.addEventListener('DOMContentLoaded', () => {
           // 控制进度增加速度，让进度更平滑
           let increment = 0;
           
-          // 根据已经过的时间调整增量
+          // 根据已经过的时间调整增量 - 降低随机性，使用固定增量
           if (progressValue < 15) {
             // 前15%很慢，模拟初始化阶段
-            increment = 0.1 + (Math.random() * 0.2);
+            increment = 0.15;
           } else if (progressValue < 40) {
             // 15-40%稍快一些
-            increment = 0.2 + (Math.random() * 0.3);
+            increment = 0.25;
           } else if (progressValue < 70) {
             // 40-70%再稍快一些
-            increment = 0.1 + (Math.random() * 0.2);
+            increment = 0.15;
           } else if (progressValue < 85) {
             // 70-85%变慢，模拟最终处理阶段
-            increment = 0.05 + (Math.random() * 0.1);
+            increment = 0.08;
           }
           
           // 限制最大进度为85%，等待完成信号
@@ -464,15 +488,33 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       
       update: function(percent) {
-        // 更新进度，但不超过90%，留出完成的空间
+        // 防止进度条跳跃：如果服务器返回的进度小于当前模拟进度，则忽略
         if (percent > progressValue && percent <= 90) {
-          progressValue = percent;
+          // 添加平滑过渡，不要直接跳到新值
+          const now = Date.now();
+          const timeDiff = now - lastUpdateTime;
+          
+          // 如果更新太快（小于2秒），或者进度差异太大（超过10%），进行平滑处理
+          if (timeDiff < 2000 || (percent - progressValue > 10)) {
+            // 平滑过渡：每次只增加一小部分
+            const smoothIncrement = Math.min(2, (percent - progressValue) / 4);
+            progressValue = progressValue + smoothIncrement;
+          } else {
+            // 在正常情况下，可以接受服务器返回的值，但也要防止跳跃
+            progressValue = Math.min(percent, progressValue + 5);
+          }
+          
           // 计算剩余时间
           const elapsedSeconds = (Date.now() - startTime) / 1000;
           const completionPercentage = progressValue / 100;
           if (completionPercentage > 0) {
             remainingTime = Math.round((elapsedSeconds / completionPercentage) * (1 - completionPercentage));
           }
+          
+          // 更新最后一次处理的值和时间
+          lastProgressValue = progressValue;
+          lastUpdateTime = now;
+          
           updateProgress(progressValue, '接收数据中...', remainingTime);
         }
       },
@@ -658,12 +700,15 @@ document.addEventListener('DOMContentLoaded', () => {
                   // 添加到完整内容
                   fullContent += content;
                   
-                  // 尝试提取进度信息
+                  // 尝试提取进度信息 - 改进提取方法
                   const progressMatch = content.match(/>进度\s*\*\*(\d+)%\*\*/i);
                   if (progressMatch && progressMatch[1]) {
                     const progressValue = parseInt(progressMatch[1], 10);
                     if (!isNaN(progressValue)) {
-                      progress.update(progressValue);
+                      // 使用防抖函数更新进度，避免频繁更新导致的跳跃
+                      if (progressValue > 10) { // 只处理有意义的进度值
+                        debouncedProgressUpdate(progress, progressValue);
+                      }
                     }
                   }
                 }

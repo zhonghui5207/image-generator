@@ -469,8 +469,9 @@ main {
   height: 100%;
   background-color: var(--primary-color);
   width: 0%;
-  transition: width 0.5s ease;
+  transition: width 0.8s ease-in-out;
   border-radius: 10px;
+  box-shadow: 0 0 5px rgba(74, 107, 223, 0.5);
 }
 
 .progress-text {
