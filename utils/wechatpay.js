@@ -70,11 +70,29 @@ function generateSign(params) {
  */
 function parseXML(xml) {
   const result = {};
-  const regex = /<([\w_]+)>(.*?)<\/\1>/g;
+  
+  // 处理基本的XML标签
+  const tagRegex = /<([\w_]+)>(.*?)<\/\1>/g;
   let match;
-  while ((match = regex.exec(xml)) !== null) {
+  while ((match = tagRegex.exec(xml)) !== null) {
+    const key = match[1];
+    let value = match[2];
+    
+    // 检查是否包含CDATA
+    const cdataMatch = /<!\[CDATA\[(.*?)\]\]>/.exec(value);
+    if (cdataMatch) {
+      value = cdataMatch[1]; // 提取CDATA中的实际内容
+    }
+    
+    result[key] = value;
+  }
+  
+  // 单独处理带CDATA的标签
+  const cdataRegex = /<([\w_]+)><!\[CDATA\[(.*?)\]\]><\/\1>/g;
+  while ((match = cdataRegex.exec(xml)) !== null) {
     result[match[1]] = match[2];
   }
+  
   return result;
 }
 
@@ -176,17 +194,22 @@ export async function createWechatPayment(orderData) {
     
     // 发送请求到微信支付API
     try {
+      console.log('准备发送XML请求数据:', xmlData);
+      
       const response = await axios.post(unifiedOrderUrl, xmlData, {
         headers: { 'Content-Type': 'text/xml' },
         timeout: 10000 // 10秒超时
       });
       
       console.log('收到HTTP响应状态码:', response.status);
-      console.log('响应数据:', response.data);
+      console.log('响应原始数据:', response.data);
+      
+      // 直接输出原始XML以便检查
+      console.log('原始XML响应:', response.data);
       
       // 解析响应XML
       const result = parseXML(response.data);
-      console.log('解析后的响应结果:', JSON.stringify(result));
+      console.log('解析后的响应结果:', JSON.stringify(result, null, 2));
       
       // 检查返回结果
       if (result.return_code === 'SUCCESS' && result.result_code === 'SUCCESS') {
@@ -201,12 +224,24 @@ export async function createWechatPayment(orderData) {
           nonceStr: params.nonce_str
         };
       } else {
-        console.error('微信支付API返回错误:', 
-          result.return_msg || result.err_code_des || '未知错误');
+        // 仔细检查错误信息
+        let errorMsg = '未知错误';
+        
+        if (result.return_code === 'FAIL') {
+          console.error('微信支付通信失败:', result.return_msg);
+          errorMsg = `通信失败: ${result.return_msg}`;
+        } else if (result.result_code === 'FAIL') {
+          console.error('微信支付业务失败:', 
+            result.err_code, result.err_code_des);
+          errorMsg = `业务失败: ${result.err_code_des || result.err_code}`;
+        }
+        
+        console.error('完整响应结果:', JSON.stringify(result, null, 2));
+        
         // 返回错误信息
         return {
           success: false,
-          message: result.return_msg || result.err_code_des || '未知错误',
+          message: errorMsg,
           error: result
         };
       }
