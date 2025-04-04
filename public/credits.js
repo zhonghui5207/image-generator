@@ -101,6 +101,9 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!selectedPackage) return;
       
       try {
+        // 获取选中的积分包ID（数字型）
+        const packageId = parseInt(selectedPackage.id, 10);
+        
         // 发送购买请求到支付系统创建订单
         const response = await fetch('/api/payment/create-order', {
           method: 'POST',
@@ -108,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            packageId: selectedPackage.id,
+            packageId: packageId,
             paymentMethod: 'wechat' // 固定使用微信支付
           })
         });
@@ -170,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function() {
       purchaseList.innerHTML = '<p class="loading-message"><i class="fas fa-spinner fa-spin"></i> 正在加载购买记录...</p>';
       
       // 尝试获取交易记录
-      const response = await fetch('/api/credits/purchases', {
+      const response = await fetch('/api/credits/transactions', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -181,8 +184,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = await response.json();
         
         // 处理数据
-        if (data.purchases && data.purchases.length > 0) {
-          displayPurchaseRecords(data.purchases);
+        if (data.transactions && data.transactions.length > 0) {
+          displayPurchaseRecords(data.transactions);
         } else {
           // 没有记录
           purchaseList.innerHTML = '<p class="empty-list">暂无购买记录</p>';
