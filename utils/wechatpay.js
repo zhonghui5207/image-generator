@@ -153,9 +153,9 @@ export async function createWechatPayment(orderData) {
       total_fee: Math.floor(orderData.amount * 100), // 将元转为分
       spbill_create_ip: orderData.ip || '127.0.0.1',
       notify_url: config.notifyUrl,
-      trade_type: 'NATIVE', // 电脑网页扫码支付
-      time_start: new Date().toISOString().replace(/[-T:.Z]/g, '').substring(0, 14),
-      time_expire: new Date(Date.now() + 30 * 60 * 1000).toISOString().replace(/[-T:.Z]/g, '').substring(0, 14) // 30分钟后过期
+      trade_type: 'NATIVE' // 电脑网页扫码支付
+      // 注释掉time_start和time_expire，让微信支付API使用默认值
+      // 微信支付的默认过期时间为2小时，符合最低要求
     };
     
     console.log('微信支付请求参数:', JSON.stringify(params));
