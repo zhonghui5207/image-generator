@@ -308,7 +308,7 @@ main {
   background-color: var(--primary-color);
   box-shadow: 0 4px 8px rgba(74, 107, 223, 0.3);
   cursor: pointer;
-  animation: pulse 2s infinite;
+  animation: pulse 1.5s infinite;
 }
 
 @keyframes pulse {
@@ -781,4 +781,25 @@ footer {
   .model-description {
     margin-left: 0;
   }
+}
+
+/* 生成提示信息样式 */
+.generation-note {
+  background-color: rgba(248, 249, 250, 0.7);
+  border-left: 3px solid var(--primary-color);
+  padding: 12px 15px;
+  margin-top: 10px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.generation-note p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.generation-note i {
+  color: var(--primary-color);
+  margin-right: 5px;
 }

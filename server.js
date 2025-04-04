@@ -174,215 +174,334 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
     try {
       console.log("Preparing API request...");
       
-      // 使用 OpenAI 的 chat completions API
-      console.log("Sending request to OpenAI API...");
       // 检查是否请求流式响应
       const useStream = req.query.stream === 'true';
       
       if (useStream) {
-        // 流式响应处理
-        console.log("Using streaming response");
+        console.log(`[${new Date().toISOString()}] 使用流式响应，准备生成`);
         
-        // 设置响应头信息以支持流式传输
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        
-        // 准备消息内容
-        let messages = [];
-        
-        if (mode === 'image-to-image') {
-          // 图生图模式：包含图片和提示词
-          const imageBase64 = image2Base64(imagePath);
-          console.log("Image converted to base64, length:", imageBase64.length);
-          
-          messages = [{
-            role: 'user', 
-            content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:image/${imageType};base64,${imageBase64}`
-                }
-              },
-              {
-                type: "text",
-                text: prompt
-              },
-            ]
-          }];
-        } else {
-          // 文生图模式：只包含提示词
-          messages = [{
-            role: 'user',
-            content: [
-              {
-                type: "text",
-                text: `请根据以下描述生成一张图片：${prompt}`
-              }
-            ]
-          }];
-        }
-        
-        // 创建流式请求
-        const stream = await openai.chat.completions.create({
-          model: selectedModel,
-          messages: messages,
-          stream: true,
-          timeout: 300000  // 增加到 5 分钟超时
+        // 设置流式响应的HTTP头
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
         });
-        
-        console.log("流式连接已建立，开始发送数据...");
         
         // 发送初始信息
-        const initialData = {
-          type: 'info',
-          content: {}
-        };
-        
-        // 只有图生图模式才发送原始图像路径
-        if (mode === 'image-to-image' && originalImagePath) {
-          initialData.content.originalImage = originalImagePath;
-        }
-        
-        res.write(`data: ${JSON.stringify(initialData)}\n\n`);
-        
-        // 收集完整响应内容（用于处理图像 URL 和历史记录）
-        let fullContent = '';
-        
-        // 处理流式响应
-        let chunkCount = 0;
-        const startTime = Date.now();
-        console.log(`[${new Date().toISOString()}] 开始接收流式数据`);
-        
-        for await (const chunk of stream) {
-          const content = chunk.choices[0]?.delta?.content || '';
-          chunkCount++;
-          
-          if (content) {
-            fullContent += content;
-            
-            // 将每个数据块发送给客户端
-            res.write(`data: ${JSON.stringify({
-              type: 'content',
-              content: content
-            })}\n\n`);
-            
-            // 每10个数据块打印一次进度
-            if (chunkCount % 10 === 0) {
-              const elapsedSeconds = (Date.now() - startTime) / 1000;
-              console.log(`[${new Date().toISOString()}] 已接收 ${chunkCount} 个数据块，内容长度: ${fullContent.length}，已用时间: ${elapsedSeconds.toFixed(1)}秒`);
+        if (originalImagePath) {
+          res.write(`data: ${JSON.stringify({
+            type: 'info',
+            content: {
+              originalImage: originalImagePath
             }
-          }
+          })}\n\n`);
         }
         
-        const totalTime = (Date.now() - startTime) / 1000;
-        console.log(`[${new Date().toISOString()}] 流式响应完成，共接收 ${chunkCount} 个数据块，总内容长度: ${fullContent.length}，总用时: ${totalTime.toFixed(1)}秒`);
-        
-        // 处理图像 URL 提取和API返回的提示词
-        let generatedImageUrl = '';
-        let apiPrompt = '';
-        let isGenerationFailed = false;
-        
-        console.log('处理图像 URL 提取，原始结果:', fullContent);
-        
-        // 尝试提取API返回的提示词
-        const promptMatch = fullContent.match(/"prompt":\s*"([^"]+)"/i);
-        if (promptMatch && promptMatch[1]) {
-          apiPrompt = promptMatch[1];
-          console.log('提取到API返回的提示词:', apiPrompt);
-        }
-        
-        // 尝试匹配图像 URL
-        let imgUrlMatch = fullContent.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/i);
-        if (!imgUrlMatch) {
-          imgUrlMatch = fullContent.match(/\[下载[^\]]*\]\((https?:\/\/[^\s)]+)\)/i);
-        }
-        if (!imgUrlMatch) {
-          imgUrlMatch = fullContent.match(/(https?:\/\/oaiusercontent[^\s"'<>]+)/i);
-        }
-        
-        if (imgUrlMatch && imgUrlMatch[1]) {
-          generatedImageUrl = imgUrlMatch[1];
-        } else if (imgUrlMatch && imgUrlMatch[0] && imgUrlMatch[0].startsWith('http')) {
-          generatedImageUrl = imgUrlMatch[0];
-        }
-        
-        if (!generatedImageUrl) {
-          console.log('未找到图像 URL，使用原始图像作为占位');
-          generatedImageUrl = originalImagePath;
-          isGenerationFailed = true; // 标记为生成失败
-        }
-        
-        // 扣除用户积分 - 根据生成结果调整积分消耗
-        const actualCreditsToUse = isGenerationFailed ? 1 : creditsToUse; // 如果生成失败，只扣1积分
-        
-        const newCreditBalance = await useCredits(
-          req.user._id, 
-          actualCreditsToUse,  // 使用调整后的积分数量
-          isGenerationFailed ? `生成图像失败 (${selectedModel})` : `生成图像 (${selectedModel})`, 
-          imageHistory._id
-        );
-        
-        // 保存生成历史记录
-        const generatedImageData = {
-          user: req.user._id, // 修正：使用user字段而不是userId，与模型定义一致,
-          generatedImage: generatedImageUrl,
+        // 创建一个临时的历史记录，记录用户请求信息
+        // 这个记录会在收到API响应后更新
+        const tempImageHistory = new GeneratedImage({
+          user: req.user._id,
           prompt: prompt,
           model: selectedModel,
-          creditsUsed: isGenerationFailed ? 1 : creditsToUse, // 如果生成失败，只扣1积分
+          status: 'processing',
           mode: mode,
-          status: isGenerationFailed ? 'failed' : 'success', // 添加状态
-          errorMessage: isGenerationFailed ? '未能生成有效图像' : null // 添加错误消息
-        };
-        
-        // 只有图生图模式才添加原始图像
-        if (mode === 'image-to-image' && originalImagePath) {
-          generatedImageData.originalImage = originalImagePath;
-        }
-        
-        const generatedImage = new GeneratedImage(generatedImageData);
-        
-        // 保存到数据库
-        await generatedImage.save().catch(err => {
-          console.error('保存历史记录失败:', err);
+          originalImage: mode === 'image-to-image' ? originalImagePath : undefined,
+          // 设置一个临时URL，这将在后续更新
+          generatedImage: originalImagePath || 'pending'
         });
         
-        // 尝试翻译提示词（如果是英文）
-        let translatedPrompt = null;
-        let apiPromptToSend = apiPrompt || prompt; // 优先使用API返回的提示词
+        // 保存临时历史记录
+        await tempImageHistory.save().catch(err => {
+          console.error('保存临时历史记录失败:', err);
+        });
         
-        if (apiPromptToSend && /[a-zA-Z]/.test(apiPromptToSend)) {
+        // 创建流式请求
+        try {
+          const stream = await openai.chat.completions.create({
+            model: selectedModel,
+            messages: mode === 'image-to-image' ? [{
+              role: 'user', 
+              content: [
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:image/${imageType};base64,${image2Base64(imagePath)}`
+                  }
+                },
+                {
+                  type: "text",
+                  text: prompt
+                },
+              ]
+            }] : [{
+              role: 'user',
+              content: [
+                {
+                  type: "text",
+                  text: `请根据以下描述生成一张图片：${prompt}`
+                }
+              ]
+            }],
+            stream: true,
+            timeout: 300000  // 5分钟超时
+          });
+          
+          // 收集完整响应内容（用于处理图像 URL 和历史记录）
+          let fullContent = '';
+          
+          // 处理流式响应
+          let chunkCount = 0;
+          const startTime = Date.now();
+          console.log(`[${new Date().toISOString()}] 开始接收流式数据`);
+          
+          for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            chunkCount++;
+            
+            if (content) {
+              fullContent += content;
+              
+              // 将每个数据块发送给客户端
+              res.write(`data: ${JSON.stringify({
+                type: 'content',
+                content: content
+              })}\n\n`);
+              
+              // 每10个数据块打印一次进度
+              if (chunkCount % 10 === 0) {
+                const elapsedSeconds = (Date.now() - startTime) / 1000;
+                console.log(`[${new Date().toISOString()}] 已接收 ${chunkCount} 个数据块，内容长度: ${fullContent.length}，已用时间: ${elapsedSeconds.toFixed(1)}秒`);
+              }
+            }
+          }
+          
+          const totalTime = (Date.now() - startTime) / 1000;
+          console.log(`[${new Date().toISOString()}] 流式响应完成，共接收 ${chunkCount} 个数据块，总内容长度: ${fullContent.length}，总用时: ${totalTime.toFixed(1)}秒`);
+          
+          // 处理图像 URL 提取和API返回的提示词
+          let generatedImageUrl = '';
+          let apiPrompt = '';
+          let isGenerationFailed = false;
+          
+          console.log('处理图像 URL 提取，原始结果:', fullContent);
+          
+          // 尝试提取API返回的提示词
+          const promptMatch = fullContent.match(/"prompt":\s*"([^"]+)"/i);
+          if (promptMatch && promptMatch[1]) {
+            apiPrompt = promptMatch[1];
+            console.log('提取到API返回的提示词:', apiPrompt);
+          }
+          
+          // 尝试匹配图像 URL
+          let imgUrlMatch = fullContent.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/i);
+          if (!imgUrlMatch) {
+            imgUrlMatch = fullContent.match(/\[下载[^\]]*\]\((https?:\/\/[^\s)]+)\)/i);
+          }
+          if (!imgUrlMatch) {
+            imgUrlMatch = fullContent.match(/(https?:\/\/oaiusercontent[^\s"'<>]+)/i);
+          }
+          
+          if (imgUrlMatch && imgUrlMatch[1]) {
+            generatedImageUrl = imgUrlMatch[1];
+          } else if (imgUrlMatch && imgUrlMatch[0] && imgUrlMatch[0].startsWith('http')) {
+            generatedImageUrl = imgUrlMatch[0];
+          }
+          
+          if (!generatedImageUrl) {
+            console.log('未找到图像 URL，使用原始图像作为占位');
+            generatedImageUrl = originalImagePath || 'https://placehold.co/600x400?text=生成失败';
+            isGenerationFailed = true; // 标记为生成失败
+          }
+          
+          // 扣除用户积分 - 根据生成结果调整积分消耗
+          const actualCreditsToUse = isGenerationFailed ? 1 : creditsToUse; // 如果生成失败，只扣1积分
+          
+          const newCreditBalance = await useCredits(
+            req.user._id, 
+            actualCreditsToUse,  // 使用调整后的积分数量
+            isGenerationFailed ? `生成图像失败 (${selectedModel})` : `生成图像 (${selectedModel})`, 
+            tempImageHistory._id  // 使用临时历史记录的ID
+          );
+          
+          // 更新生成历史记录
+          tempImageHistory.generatedImage = generatedImageUrl;
+          tempImageHistory.creditsUsed = actualCreditsToUse;
+          tempImageHistory.status = isGenerationFailed ? 'failed' : 'success';
+          tempImageHistory.errorMessage = isGenerationFailed ? '未能生成有效图像' : null;
+          
+          // 保存更新后的记录
+          await tempImageHistory.save().catch(err => {
+            console.error('更新历史记录失败:', err);
+          });
+          
+          // 尝试翻译提示词（如果是英文）
+          let translatedPrompt = null;
+          let apiPromptToSend = apiPrompt || prompt; // 优先使用API返回的提示词
+          
+          if (apiPromptToSend && /[a-zA-Z]/.test(apiPromptToSend)) {
+            try {
+              // 这里可以调用翻译API，但为了简化，我们在前端处理翻译
+              // translatedPrompt = await translateText(apiPromptToSend);
+              translatedPrompt = apiPromptToSend; // 前端会处理翻译
+            } catch (error) {
+              console.error('翻译提示词时出错:', error);
+            }
+          }
+          
+          // 发送最终结果
+          res.write(`data: ${JSON.stringify({
+            type: 'result',
+            content: {
+              success: true,
+              generatedImageUrl: generatedImageUrl,
+              apiPrompt: apiPrompt, // 发送API返回的英文提示词
+              userPrompt: prompt, // 发送用户输入的原始提示词
+              translatedPrompt: translatedPrompt,
+              generationFailed: isGenerationFailed, // 添加生成失败标记
+              credits: {
+                used: actualCreditsToUse, // 返回实际扣除的积分
+                remaining: newCreditBalance
+              },
+              historyId: tempImageHistory._id  // 使用临时历史记录的ID
+            }
+          })}\n\n`);
+          
+          // 结束流式响应
+          res.end();
+          return;
+        } catch (apiError) {
+          // 流式响应时的API错误处理
+          console.error('流式响应API错误:');
+          console.error('Error name:', apiError.name);
+          console.error('Error message:', apiError.message);
+          console.error('Error stack:', apiError.stack);
+          
+          let errorMessage = 'OpenAI API Error';
+          
+          // 分析错误类型并提供更有用的错误信息
+          if (apiError.message.includes('Connection error')) {
+            errorMessage = '无法连接到 OpenAI API。请检查您的网络连接和 API 配置。';
+          } else if (apiError.message.includes('timeout')) {
+            errorMessage = '请求超时。OpenAI API 响应时间过长。';
+          } else if (apiError.message.includes('401')) {
+            errorMessage = 'API 密钥无效。请检查您的 OpenAI API 密钥。';
+          } else if (apiError.message.includes('429')) {
+            errorMessage = '请求频率超限。请稍后再试。';
+          } else if (apiError.message.includes('Premature close')) {
+            errorMessage = '连接过早关闭。这可能是由于网络问题或代理设置导致的。';
+          }
+          
           try {
-            // 这里可以调用翻译API，但为了简化，我们在前端处理翻译
-            // translatedPrompt = await translateText(apiPromptToSend);
-            translatedPrompt = apiPromptToSend; // 前端会处理翻译
-          } catch (error) {
-            console.error('翻译提示词时出错:', error);
+            // 生成失败时只扣除1积分
+            const failureCreditsToUse = 1;
+            
+            // 设置一个有效的生成图像URL，即使是占位符
+            const placeholderImage = originalImagePath || 'https://placehold.co/600x400?text=生成失败';
+            
+            // 更新临时历史记录以反映错误
+            if (tempImageHistory) {
+              tempImageHistory.status = 'failed';
+              tempImageHistory.errorMessage = errorMessage;
+              tempImageHistory.generatedImage = placeholderImage;
+              tempImageHistory.creditsUsed = failureCreditsToUse;
+              
+              await tempImageHistory.save().catch(err => {
+                console.error('更新失败历史记录错误:', err);
+              });
+              
+              // 扣除1积分
+              const newCreditBalance = await useCredits(
+                req.user._id,
+                failureCreditsToUse,
+                `生成图像失败 (${selectedModel}) - ${errorMessage}`,
+                tempImageHistory._id
+              ).catch(err => {
+                console.error('扣除积分错误:', err);
+                return req.user.credits - failureCreditsToUse; // 如果扣积分失败，估算新余额
+              });
+              
+              // 对于流式响应，发送错误信息数据块
+              res.write(`data: ${JSON.stringify({
+                type: 'error',
+                content: {
+                  message: errorMessage,
+                  details: apiError.message,
+                  generationFailed: true,
+                  requiredCredits: creditsToUse,
+                  currentCredits: req.user.credits,
+                  creditsNeeded: Math.max(0, creditsToUse - req.user.credits)
+                }
+              })}\n\n`);
+            } else {
+              // 如果临时历史记录不存在，创建一个新的失败记录
+              const failedImageData = {
+                user: req.user._id,
+                generatedImage: placeholderImage,
+                prompt: prompt,
+                model: selectedModel,
+                creditsUsed: failureCreditsToUse,
+                mode: mode,
+                status: 'failed',
+                errorMessage: errorMessage
+              };
+              
+              // 如果是图生图模式且有原始图像，添加原始图像
+              if (mode === 'image-to-image' && originalImagePath) {
+                failedImageData.originalImage = originalImagePath;
+              }
+              
+              // 保存失败记录
+              const failedImage = new GeneratedImage(failedImageData);
+              await failedImage.save().catch(err => {
+                console.error('保存失败历史记录错误:', err);
+              });
+              
+              // 扣除1积分
+              const newCreditBalance = await useCredits(
+                req.user._id,
+                failureCreditsToUse,
+                `生成图像失败 (${selectedModel}) - ${errorMessage}`,
+                failedImage._id
+              ).catch(err => {
+                console.error('扣除积分错误:', err);
+                return req.user.credits - failureCreditsToUse; // 如果扣积分失败，估算新余额
+              });
+              
+              // 对于流式响应，发送错误信息数据块
+              res.write(`data: ${JSON.stringify({
+                type: 'error',
+                content: {
+                  message: errorMessage,
+                  details: apiError.message,
+                  generationFailed: true,
+                  requiredCredits: creditsToUse,
+                  currentCredits: req.user.credits,
+                  creditsNeeded: Math.max(0, creditsToUse - req.user.credits)
+                }
+              })}\n\n`);
+            }
+            
+            // 结束流式响应
+            res.end();
+            return;
+          } catch (creditError) {
+            console.error('处理流式API错误时积分处理失败:', creditError);
+            
+            // 发送错误数据块
+            res.write(`data: ${JSON.stringify({
+              type: 'error',
+              content: {
+                message: errorMessage + ' (积分处理失败)',
+                details: apiError.message,
+                generationFailed: true
+              }
+            })}\n\n`);
+            
+            // 结束流式响应
+            res.end();
+            return;
           }
         }
-        
-        // 发送最终结果
-        res.write(`data: ${JSON.stringify({
-          type: 'result',
-          content: {
-            success: true,
-            generatedImageUrl: generatedImageUrl,
-            apiPrompt: apiPrompt, // 发送API返回的英文提示词
-            userPrompt: prompt, // 发送用户输入的原始提示词
-            translatedPrompt: translatedPrompt,
-            generationFailed: isGenerationFailed, // 添加生成失败标记
-            credits: {
-              used: actualCreditsToUse, // 返回实际扣除的积分
-              remaining: newCreditBalance
-            },
-            historyId: generatedImage._id
-          }
-        })}\n\n`);
-        
-        // 结束流式响应
-        res.end();
-        return;
       } else {
         // 非流式响应处理（原有方式）
         let messages = [];
@@ -507,7 +626,7 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           req.user._id, 
           actualCreditsToUse,  // 使用调整后的积分数量
           isGenerationFailed ? `生成图像失败 (${selectedModel})` : `生成图像 (${selectedModel})`, 
-          imageHistory._id
+          generatedImage._id  // 使用已保存的生成图像记录ID，而不是未定义的imageHistory
         );
         
         // 发送响应回客户端
@@ -521,7 +640,7 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
             remaining: newCreditBalance
           },
           updatedCredits: newCreditBalance, // 添加更新后的积分，方便前端直接使用
-          historyId: imageHistory._id,
+          historyId: generatedImage._id,  // 使用正确的ID
           model: selectedModel  // 返回使用的模型名称
         });
       }
@@ -562,10 +681,13 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           // 生成失败时只扣除1积分
           const failureCreditsToUse = 1;
           
+          // 设置一个有效的生成图像URL，即使是占位符
+          const placeholderImage = originalImagePath || 'https://placehold.co/600x400?text=生成失败';
+          
           // 保存失败的生成历史记录
           const failedImageData = {
             user: req.user._id,
-            generatedImage: originalImagePath || '', // 使用原始图像或空字符串
+            generatedImage: placeholderImage, // 使用占位图像或原始图像，而不是空字符串
             prompt: prompt,
             model: selectedModel,
             creditsUsed: failureCreditsToUse,

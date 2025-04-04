@@ -117,6 +117,40 @@ export const useCredits = async (userId, amount, description, imageId) => {
   }
 };
 
+// 添加积分（内部API，由支付系统调用）
+export const addCredits = async (userId, amount, description, orderId) => {
+  try {
+    // 查找用户
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error('用户不存在');
+    }
+    
+    // 验证参数
+    if (!amount || amount <= 0) {
+      throw new Error('无效的积分数量');
+    }
+    
+    // 增加积分
+    user.credits += amount;
+    await user.save();
+    
+    // 记录交易
+    await CreditTransaction.create({
+      user: userId,
+      amount: amount,
+      type: 'purchase',
+      description: description || '购买积分',
+      orderId
+    });
+    
+    return user.credits; // 返回新的积分余额
+  } catch (error) {
+    console.error('添加积分错误:', error);
+    throw error;
+  }
+};
+
 // 管理员：赠送积分
 router.post('/gift', authenticate, isAdmin, async (req, res) => {
   try {

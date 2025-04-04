@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 图像生成器</title>
+    <title>柯达鸭 AI 图像生成器</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="auth.css">
     <link rel="stylesheet" href="auth-styles.css">
@@ -26,7 +26,7 @@
 <body>
     <div class="container">
         <header>
-            <h1><span class="icon-wrapper"><i class="fas fa-magic"></i><span class="icon-fallback"></span></span> AI 图像生成器</h1>
+            <h1><span class="icon-wrapper"><i class="fas fa-magic"></i><span class="icon-fallback"></span></span> 柯达鸭 AI 图像生成器</h1>
             <p>使用 GPT-4o 生成创意图像，支持图生图和文生图两种模式</p>
             <nav class="main-nav">
                 <ul>
@@ -48,7 +48,7 @@
                     <div class="credits-label">当前积分余额</div>
                 </div>
                 <div class="credits-message">
-                    <p><i class="fas fa-coins"></i> 根据模型不同，每次生成图像消耗 2-8 积分</p>
+                    <p><i class="fas fa-coins"></i> 根据模型不同，每次生成图像消耗 4-8 积分</p>
                     <a href="credits.html" class="buy-credits-link"><i class="fas fa-plus-circle"></i> 购买积分</a>
                 </div>
             </div>
@@ -166,6 +166,9 @@
                     <button type="submit" id="generate-btn" class="generate-btn" disabled>
                         <span class="icon-wrapper"><i class="fas fa-wand-magic-sparkles"></i><span class="icon-fallback"></span></span> <span id="generate-btn-text">生成图像</span>
                     </button>
+                    <div class="generation-note">
+                        <p><i class="fas fa-info-circle"></i> 生成图片需要1-5分钟，请耐心等待，模型繁忙时图片会生成失败，请求失败也有成本消耗1积分，敬请谅解。请重试或者更换模型生成或更换时段生成。</p>
+                    </div>
                 </form>
             </div>
 
@@ -231,7 +234,7 @@
         </div>
 
         <footer>
-            <p>© 2025 AI 图像生成器 | 使用 OpenAI GPT-4o API</p>
+            <p>© 2025 柯达鸭 AI 图像生成器 | 使用 OpenAI GPT-4o</p>
         </footer>
     </div>
 

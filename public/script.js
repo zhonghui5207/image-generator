@@ -730,14 +730,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // 重置进度条和加载状态
                 progress.reset();
-                setTimeout(() => {
-                  loadingIndicator.style.display = 'none';
-                }, 1000);
                 
-                // 终止流式连接
-                if (eventSource) {
-                  eventSource.close();
-                }
+                // 立即隐藏加载指示器，不要延迟
+                loadingIndicator.style.display = 'none';
+                
+                // 重置表单状态，让用户可以重试
+                uploadForm.parentElement.hidden = false;
+                resultContainer.hidden = true;
+                
+                // 终止处理，提前返回
+                return;
               } else if (data.type === 'result') {
                 // 最终结果
                 generatedImageUrl = data.content.generatedImageUrl;
@@ -888,8 +890,15 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       console.error('流式响应错误:', error);
       showError(error.message || '处理流式响应时出错');
+      
+      // 重置进度条
+      progress.reset();
+      
+      // 重置表单状态，让用户可以重试
+      uploadForm.parentElement.hidden = false;
+      resultContainer.hidden = true;
     } finally {
-      // 延迟隐藏加载指示器
+      // 确保无论如何都会隐藏加载指示器
       setTimeout(() => {
         loadingIndicator.style.display = 'none';
       }, 1000);
@@ -922,15 +931,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectedModel = document.querySelector('input[name="model"]:checked').value;
     
     // 确定消耗的积分数量
-    let creditsToUse = 1; // 默认消耗1积分
+    let creditsToUse = 4; // 默认标准模式消耗4积分
     if (selectedModel === 'gpt-4o-image-vip') {
-      creditsToUse = 2; // VIP模型消耗2积分
+      creditsToUse = 8; // 专业模式消耗8积分
+    } else if (selectedModel === 'gpt-4o-all') {
+      creditsToUse = 5; // 高级模式消耗5积分
     }
     
     // 检查用户积分是否足够
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     if (user && user.credits < creditsToUse) {
-      showError(`积分不足！${selectedModel === 'gpt-4o-image-vip' ? 'VIP模型需要2积分' : '生成图像需要1积分'}，您当前只有 ${user.credits} 积分。`);
+      // 根据模型显示对应的积分消耗信息
+      let modelCreditsMsg = '';
+      if (selectedModel === 'gpt-4o-image-vip') {
+        modelCreditsMsg = '专业模式需要8积分';
+      } else if (selectedModel === 'gpt-4o-all') {
+        modelCreditsMsg = '高级模式需要5积分';
+      } else {
+        modelCreditsMsg = '标准模式需要4积分';
+      }
+      
+      showError(`积分不足！${modelCreditsMsg}，您当前只有 ${user.credits} 积分。`);
       uploadForm.parentElement.hidden = false;
       loadingIndicator.style.display = 'none';
       return;
@@ -1128,6 +1149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // console.error('错误:', message);
     
     // 重置进度条（如果存在）
+    
     // 显示错误信息
     errorMessage.textContent = message || '生成图像时出现错误';
     errorContainer.style.display = 'block';
@@ -1135,6 +1157,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // 重置表单状态，确保用户可以重新尝试
     uploadForm.parentElement.hidden = false;
     resultContainer.hidden = true;
+    
+    // 确保加载指示器隐藏
+    loadingIndicator.style.display = 'none';
   }
   
   function resetForm() {
