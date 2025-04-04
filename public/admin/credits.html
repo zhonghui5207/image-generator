@@ -4,24 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>积分管理 - AI绘画生成器后台</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="admin-container">
         <!-- 侧边栏 -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="logo">
-                <h2>AI绘画生成器</h2>
+                <h2>AI 图像生成器</h2>
                 <p>管理后台</p>
             </div>
+            
             <ul class="nav-menu">
-                <li><a href="index.html"><i class="bi bi-speedometer2"></i> 控制面板</a></li>
-                <li><a href="users.html"><i class="bi bi-people"></i> 用户管理</a></li>
-                <li><a href="credits.html" class="active"><i class="bi bi-coin"></i> 积分管理</a></li>
-                <li><a href="orders.html"><i class="bi bi-cart"></i> 订单管理</a></li>
-                <li><a href="images.html"><i class="bi bi-image"></i> 图片管理</a></li>
-                <li><a href="settings.html"><i class="bi bi-gear"></i> 系统设置</a></li>
+                <li>
+                    <a href="index.html">
+                        <i class="fas fa-tachometer-alt"></i> 概览
+                    </a>
+                </li>
+                <li>
+                    <a href="users.html">
+                        <i class="fas fa-users"></i> 用户管理
+                    </a>
+                </li>
+                <li>
+                    <a href="credits.html" class="active">
+                        <i class="fas fa-coins"></i> 积分管理
+                    </a>
+                </li>
+                <li>
+                    <a href="orders.html">
+                        <i class="fas fa-shopping-cart"></i> 订单管理
+                    </a>
+                </li>
+                <li>
+                    <a href="payments.html">
+                        <i class="fas fa-credit-card"></i> 支付配置
+                    </a>
+                </li>
+                <li>
+                    <a href="settings.html">
+                        <i class="fas fa-cog"></i> 系统设置
+                    </a>
+                </li>
             </ul>
         </aside>
 
@@ -29,22 +54,22 @@
         <main class="main-content">
             <!-- 顶部导航栏 -->
             <header class="header">
-                <div class="header-left">
-                    <button class="toggle-sidebar">
-                        <i class="bi bi-list"></i>
-                    </button>
-                    <div class="header-title">
-                        <h2>积分管理</h2>
-                    </div>
+                <button class="toggle-sidebar" id="toggle-sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+                
+                <div class="header-title">
+                    <h2>积分管理</h2>
                 </div>
+                
                 <div class="user-menu">
-                    <button class="user-menu-btn">
+                    <button class="user-menu-btn" id="user-menu-btn">
                         <span id="admin-username">管理员</span>
-                        <i class="bi bi-chevron-down"></i>
+                        <i class="fas fa-chevron-down"></i>
                     </button>
-                    <div class="user-dropdown">
-                        <a href="settings.html"><i class="bi bi-gear"></i> 设置</a>
-                        <a href="#" id="logout-btn"><i class="bi bi-box-arrow-right"></i> 退出登录</a>
+                    
+                    <div class="user-dropdown" id="user-dropdown">
+                        <a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 退出登录</a>
                     </div>
                 </div>
             </header>
@@ -53,7 +78,7 @@
             <div class="stats-cards">
                 <div class="stat-card">
                     <div class="stat-icon" style="background-color: rgba(0, 123, 255, 0.1); color: #007bff;">
-                        <i class="bi bi-coin"></i>
+                        <i class="fas fa-coins"></i>
                     </div>
                     <div class="stat-info">
                         <h3>总发放积分</h3>
@@ -62,7 +87,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon" style="background-color: rgba(40, 167, 69, 0.1); color: #28a745;">
-                        <i class="bi bi-arrow-down-circle"></i>
+                        <i class="fas fa-arrow-down"></i>
                     </div>
                     <div class="stat-info">
                         <h3>本月充值积分</h3>
@@ -71,7 +96,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon" style="background-color: rgba(220, 53, 69, 0.1); color: #dc3545;">
-                        <i class="bi bi-arrow-up-circle"></i>
+                        <i class="fas fa-arrow-up"></i>
                     </div>
                     <div class="stat-info">
                         <h3>本月消费积分</h3>
@@ -80,7 +105,7 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon" style="background-color: rgba(255, 193, 7, 0.1); color: #ffc107;">
-                        <i class="bi bi-person-badge"></i>
+                        <i class="fas fa-exchange-alt"></i>
                     </div>
                     <div class="stat-info">
                         <h3>积分交易总数</h3>
@@ -93,7 +118,7 @@
             <div class="filter-container">
                 <div class="search-box">
                     <input type="text" id="search-input" placeholder="搜索用户名、交易ID...">
-                    <button id="search-btn"><i class="bi bi-search"></i></button>
+                    <button id="search-btn"><i class="fas fa-search"></i></button>
                 </div>
                 <div class="filter-options">
                     <select id="transaction-type">
@@ -115,10 +140,10 @@
             <!-- 积分操作按钮 -->
             <div class="action-buttons" style="margin-bottom: 20px;">
                 <button class="btn btn-primary" id="add-credits-btn">
-                    <i class="bi bi-plus-circle"></i> 添加积分
+                    <i class="fas fa-plus-circle"></i> 添加积分
                 </button>
                 <button class="btn btn-secondary" id="export-btn">
-                    <i class="bi bi-download"></i> 导出数据
+                    <i class="fas fa-download"></i> 导出数据
                 </button>
             </div>
 
@@ -214,6 +239,33 @@
             
             // 模态窗口关闭按钮
             document.querySelector('.close-modal').addEventListener('click', hideAddCreditsModal);
+            
+            // 添加侧边栏切换事件
+            document.getElementById('toggle-sidebar').addEventListener('click', function() {
+                document.getElementById('sidebar').classList.toggle('collapsed');
+                document.querySelector('.main-content').classList.toggle('expanded');
+            });
+            
+            // 添加用户菜单切换事件
+            document.getElementById('user-menu-btn').addEventListener('click', function() {
+                document.getElementById('user-dropdown').classList.toggle('show');
+            });
+            
+            // 添加登出事件
+            document.getElementById('logout-btn').addEventListener('click', function(e) {
+                e.preventDefault();
+                adminUtils.logout();
+            });
+            
+            // 点击页面其他地方关闭下拉菜单
+            window.addEventListener('click', function(e) {
+                if (!e.target.matches('.user-menu-btn') && !e.target.parentNode.matches('.user-menu-btn')) {
+                    const dropdown = document.getElementById('user-dropdown');
+                    if (dropdown.classList.contains('show')) {
+                        dropdown.classList.remove('show');
+                    }
+                }
+            });
         });
         
         // 加载积分统计数据
@@ -309,7 +361,7 @@
                     <td>${adminUtils.escapeHtml(transaction.remarks || '')}</td>
                     <td>
                         <button class="btn btn-sm btn-primary view-transaction" data-id="${transaction.id}">
-                            <i class="bi bi-eye"></i>
+                            <i class="fas fa-eye"></i>
                         </button>
                     </td>
                 `;
@@ -336,7 +388,7 @@
             prevLi.className = currentPage === 1 ? 'disabled' : '';
             const prevLink = document.createElement('a');
             prevLink.href = '#';
-            prevLink.innerHTML = '<i class="bi bi-chevron-left"></i>';
+            prevLink.innerHTML = '<i class="fas fa-chevron-left"></i>';
             if (currentPage !== 1) {
                 prevLink.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -373,7 +425,7 @@
             nextLi.className = currentPage === totalPages ? 'disabled' : '';
             const nextLink = document.createElement('a');
             nextLink.href = '#';
-            nextLink.innerHTML = '<i class="bi bi-chevron-right"></i>';
+            nextLink.innerHTML = '<i class="fas fa-chevron-right"></i>';
             if (currentPage !== totalPages) {
                 nextLink.addEventListener('click', (e) => {
                     e.preventDefault();

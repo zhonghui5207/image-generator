@@ -25,6 +25,22 @@ const adminUtils = {
       usernameElement.textContent = adminUsername;
     }
     
+    // 检查令牌是否过期（JWT的payload部分是Base64编码的JSON）
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminUsername');
+        window.location.href = '/admin/login.html';
+        return false;
+      }
+    } catch (e) {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUsername');
+      window.location.href = '/admin/login.html';
+      return false;
+    }
+    
     return true;
   },
   
@@ -234,37 +250,4 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 用户下拉菜单
   const userMenuBtn = document.querySelector('.user-menu-btn');
-  const userDropdown = document.querySelector('.user-dropdown');
-  
-  if (userMenuBtn && userDropdown) {
-    userMenuBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      userDropdown.classList.toggle('show');
-    });
-    
-    // 点击页面其他地方关闭下拉菜单
-    document.addEventListener('click', function() {
-      userDropdown.classList.remove('show');
-    });
-    
-    // 防止点击下拉菜单本身导致关闭
-    userDropdown.addEventListener('click', function(e) {
-      e.stopPropagation();
-    });
-  }
-  
-  // 退出登录按钮
-  const logoutBtn = document.getElementById('logout-btn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', function(e) {
-      e.preventDefault();
-      
-      // 清除存储的令牌
-      localStorage.removeItem('adminToken');
-      localStorage.removeItem('adminUsername');
-      
-      // 跳转到登录页面
-      window.location.href = 'login.html';
-    });
-  }
-}); 
+document.head.appendChild(style); 

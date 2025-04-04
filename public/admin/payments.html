@@ -1,1 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>支付配置 - AI绘画生成器后台</title>
+  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="admin-container">
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="logo">
+        <h2>AI 图像生成器</h2>
+        <p>管理后台</p>
+      </div>
+      
+      <ul class="nav-menu">
+        <li>
+          <a href="index.html">
+            <i class="fas fa-tachometer-alt"></i> 概览
+          </a>
+        </li>
+        <li>
+          <a href="users.html">
+            <i class="fas fa-users"></i> 用户管理
+          </a>
+        </li>
+        <li>
+          <a href="credits.html">
+            <i class="fas fa-coins"></i> 积分管理
+          </a>
+        </li>
+        <li>
+          <a href="orders.html">
+            <i class="fas fa-shopping-cart"></i> 订单管理
+          </a>
+        </li>
+        <li>
+          <a href="payments.html" class="active">
+            <i class="fas fa-credit-card"></i> 支付配置
+          </a>
+        </li>
+        <li>
+          <a href="settings.html">
+            <i class="fas fa-cog"></i> 系统设置
+          </a>
+        </li>
+      </ul>
+    </aside>
 
+    <!-- 主内容区域 -->
+    <main class="main-content">
+      <!-- 顶部导航栏 -->
+      <header class="header">
+        <button class="toggle-sidebar" id="toggle-sidebar">
+          <i class="fas fa-bars"></i>
+        </button>
+        <div class="header-title">
+          <h2>支付配置</h2>
+        </div>
+        <div class="user-menu">
+          <button class="user-menu-btn" id="user-menu-btn">
+            <span id="admin-username">管理员</span>
+            <i class="fas fa-chevron-down"></i>
+          </button>
+          <div class="user-dropdown" id="user-dropdown">
+            <a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 退出登录</a>
+          </div>
+        </div>
+      </header>
+      
+      <!-- 支付配置说明 -->
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <span>配置支付渠道后才能启用用户充值和购买服务。所有密钥将使用安全算法存储。</span>
+      </div>
+      
+      <!-- 支付状态总览 -->
+      <div class="stats-cards">
+        <div class="stat-card">
+          <div class="stat-icon" style="background-color: rgba(40, 167, 69, 0.1); color: #28a745;">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="stat-info">
+            <h3>已启用的支付渠道</h3>
+            <p id="enabled-channels">0</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background-color: rgba(0, 123, 255, 0.1); color: #007bff;">
+            <i class="fas fa-shopping-cart"></i>
+          </div>
+          <div class="stat-info">
+            <h3>今日交易笔数</h3>
+            <p id="today-orders">0</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background-color: rgba(255, 193, 7, 0.1); color: #ffc107;">
+            <i class="fas fa-yen-sign"></i>
+          </div>
+          <div class="stat-info">
+            <h3>今日交易金额</h3>
+            <p id="today-amount">¥0.00</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background-color: rgba(220, 53, 69, 0.1); color: #dc3545;">
+            <i class="fas fa-exclamation-circle"></i>
+          </div>
+          <div class="stat-info">
+            <h3>未配置渠道</h3>
+            <p id="unconfigured-channels">2</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 标签页 -->
+      <div class="tabs">
+        <div class="tab-header">
+          <div class="tab active" data-tab="wechat">
+            <i class="fab fa-weixin"></i> 微信支付
+          </div>
+          <div class="tab" data-tab="alipay">
+            <i class="fab fa-alipay"></i> 支付宝
+          </div>
+        </div>
+        
+        <!-- 标签页内容将在下一步添加 -->
+        
+        <!-- 微信支付配置 -->
+        <div class="tab-content active" id="wechat-tab">
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fab fa-weixin"></i> 微信支付配置</h3>
+              <div class="toggle-switch">
+                <input type="checkbox" id="wechat-enabled" class="toggle-input">
+                <label for="wechat-enabled" class="toggle-label"></label>
+              </div>
+            </div>
+            <div class="card-body">
+              <form id="wechat-form">
+                <div class="form-group">
+                  <label for="wechat-app-id">AppID</label>
+                  <input type="text" id="wechat-app-id" placeholder="微信支付AppID" required>
+                  <small>在微信商户平台获取的应用ID</small>
+                </div>
+                <div class="form-group">
+                  <label for="wechat-mch-id">商户号</label>
+                  <input type="text" id="wechat-mch-id" placeholder="微信支付商户号" required>
+                  <small>微信支付分配的商户号</small>
+                </div>
+                <div class="form-group">
+                  <label for="wechat-secret-key">API密钥</label>
+                  <div class="password-input">
+                    <input type="password" id="wechat-secret-key" placeholder="微信支付API密钥" required>
+                    <button type="button" class="toggle-password">
+                      <i class="fas fa-eye"></i>
+                    </button>
+                  </div>
+                  <small>用于签名的API密钥</small>
+                </div>
+                <div class="form-group">
+                  <label for="wechat-cert-file">API证书文件</label>
+                  <div class="file-upload">
+                    <input type="file" id="wechat-cert-file" accept=".p12,.pem,.cert">
+                    <label for="wechat-cert-file">
+                      <i class="fas fa-upload"></i> 选择文件
+                    </label>
+                    <span id="wechat-cert-filename">未选择文件</span>
+                  </div>
+                  <small>申请退款等高级功能需要证书</small>
+                </div>
+                <div class="form-group">
+                  <label for="wechat-notify-url">回调通知URL</label>
+                  <input type="url" id="wechat-notify-url" placeholder="https://example.com/api/wechat/notify" required>
+                  <small>支付结果通知回调URL，必须为https</small>
+                </div>
+                <div class="form-group">
+                  <label>支持的支付方式</label>
+                  <div class="checkbox-group">
+                    <div class="checkbox">
+                      <input type="checkbox" id="wechat-jsapi" checked>
+                      <label for="wechat-jsapi">JSAPI支付</label>
+                    </div>
+                    <div class="checkbox">
+                      <input type="checkbox" id="wechat-native" checked>
+                      <label for="wechat-native">扫码支付</label>
+                    </div>
+                    <div class="checkbox">
+                      <input type="checkbox" id="wechat-h5">
+                      <label for="wechat-h5">H5支付</label>
+                    </div>
+                    <div class="checkbox">
+                      <input type="checkbox" id="wechat-mini">
+                      <label for="wechat-mini">小程序支付</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button type="button" id="wechat-test-btn" class="btn btn-secondary">
+                    <i class="fas fa-vial"></i> 测试连接
+                  </button>
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> 保存配置
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 支付宝配置 -->
+        <div class="tab-content" id="alipay-tab">
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="fab fa-alipay"></i> 支付宝配置</h3>
+              <div class="toggle-switch">
+                <input type="checkbox" id="alipay-enabled" class="toggle-input">
+                <label for="alipay-enabled" class="toggle-label"></label>
+              </div>
+            </div>
+            <div class="card-body">
+              <form id="alipay-form">
+                <div class="form-group">
+                  <label for="alipay-app-id">AppID</label>
+                  <input type="text" id="alipay-app-id" placeholder="支付宝AppID" required>
+                  <small>在支付宝开放平台获取的应用ID</small>
+                </div>
+                <div class="form-group">
+                  <label for="alipay-private-key">应用私钥</label>
+                  <div class="password-textarea">
+                    <textarea id="alipay-private-key" placeholder="支付宝应用私钥" rows="3" required style="-webkit-text-security: disc;"></textarea>
+                    <button type="button" class="toggle-password">
+                      <i class="fas fa-eye"></i>
+                    </button>
+                  </div>
+                  <small>用于签名的应用私钥，请妥善保管</small>
+                </div>
+                <div class="form-group">
+                  <label for="alipay-public-key">支付宝公钥</label>
+                  <textarea id="alipay-public-key" placeholder="支付宝公钥" rows="3" required></textarea>
+                  <small>用于验证支付宝签名</small>
+                </div>
+                <div class="form-group">
+                  <label for="alipay-notify-url">回调通知URL</label>
+                  <input type="url" id="alipay-notify-url" placeholder="https://example.com/api/alipay/notify" required>
+                  <small>支付结果通知回调URL</small>
+                </div>
+                <div class="form-group">
+                  <label for="alipay-return-url">支付成功跳转URL</label>
+                  <input type="url" id="alipay-return-url" placeholder="https://example.com/payment-success">
+                  <small>用户支付成功后的跳转页面，可选</small>
+                </div>
+                <div class="form-group">
+                  <label>支持的支付方式</label>
+                  <div class="checkbox-group">
+                    <div class="checkbox">
+                      <input type="checkbox" id="alipay-web" checked>
+                      <label for="alipay-web">电脑网站支付</label>
+                    </div>
+                    <div class="checkbox">
+                      <input type="checkbox" id="alipay-wap" checked>
+                      <label for="alipay-wap">手机网站支付</label>
+                    </div>
+                    <div class="checkbox">
+                      <input type="checkbox" id="alipay-app">
+                      <label for="alipay-app">APP支付</label>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button type="button" id="alipay-test-btn" class="btn btn-secondary">
+                    <i class="fas fa-vial"></i> 测试连接
+                  </button>
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> 保存配置
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  
+  <script src="js/admin.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // 检查登录状态
+      if (!adminUtils.checkAdminAuth()) return;
+      
+      // 初始化统计数据
+      loadPaymentStats();
+      
+      // 初始化表单数据
+      loadWechatConfig();
+      loadAlipayConfig();
+      
+      // 添加侧边栏切换事件
+      document.getElementById('toggle-sidebar').addEventListener('click', function() {
+        document.getElementById('sidebar').classList.toggle('collapsed');
+        document.querySelector('.main-content').classList.toggle('expanded');
+      });
+      
+      // 添加用户菜单切换事件
+      document.getElementById('user-menu-btn').addEventListener('click', function() {
+        document.getElementById('user-dropdown').classList.toggle('show');
+      });
+      
+      // 添加登出事件
+      document.getElementById('logout-btn').addEventListener('click', function(e) {
+        e.preventDefault();
+        adminUtils.logout();
+      });
+      
+      // 点击页面其他地方关闭下拉菜单
+      window.addEventListener('click', function(e) {
+        if (!e.target.matches('.user-menu-btn') && !e.target.parentNode.matches('.user-menu-btn')) {
+          const dropdown = document.getElementById('user-dropdown');
+          if (dropdown.classList.contains('show')) {
+            dropdown.classList.remove('show');
+          }
+        }
+      });
+      
+      // 标签页切换
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+          // 移除所有标签的活动状态
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          // 隐藏所有标签内容
+          document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+          
+          // 添加当前标签的活动状态
+          this.classList.add('active');
+          // 显示当前标签的内容
+          const tabId = this.getAttribute('data-tab');
+          document.getElementById(`${tabId}-tab`).classList.add('active');
+        });
+      });
+      
+      // 密码显示切换
+      document.querySelectorAll('.toggle-password').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const input = this.parentElement.querySelector('input, textarea');
+          const icon = this.querySelector('i');
+          
+          if (input.tagName.toLowerCase() === 'textarea') {
+            if (input.style.webkitTextSecurity === 'none' || !input.style.webkitTextSecurity) {
+              input.style.webkitTextSecurity = 'disc';
+              icon.classList.replace('fa-eye-slash', 'fa-eye');
+            } else {
+              input.style.webkitTextSecurity = 'none';
+              icon.classList.replace('fa-eye', 'fa-eye-slash');
+            }
+          } else {
+            if (input.type === 'password') {
+              input.type = 'text';
+              icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+              input.type = 'password';
+              icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+          }
+        });
+      });
+      
+      // 文件上传显示文件名
+      document.getElementById('wechat-cert-file').addEventListener('change', function(e) {
+        const filename = e.target.files[0] ? e.target.files[0].name : '未选择文件';
+        document.getElementById('wechat-cert-filename').textContent = filename;
+      });
+      
+      // 表单提交事件
+      document.getElementById('wechat-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveWechatConfig();
+      });
+      
+      document.getElementById('alipay-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveAlipayConfig();
+      });
+      
+      // 测试连接事件
+      document.getElementById('wechat-test-btn').addEventListener('click', testWechatConnection);
+      document.getElementById('alipay-test-btn').addEventListener('click', testAlipayConnection);
+      
+      // 启用/禁用切换
+      document.getElementById('wechat-enabled').addEventListener('change', function() {
+        toggleWechatEnabled(this.checked);
+      });
+      
+      document.getElementById('alipay-enabled').addEventListener('change', function() {
+        toggleAlipayEnabled(this.checked);
+      });
+    });
+    
+    // 加载支付统计数据
+    async function loadPaymentStats() {
+      try {
+        const response = await adminUtils.apiRequest('/api/admin/payments/stats');
+        
+        if (response && response.success) {
+          document.getElementById('enabled-channels').textContent = response.enabledChannels || 0;
+          document.getElementById('today-orders').textContent = response.todayOrders || 0;
+          document.getElementById('today-amount').textContent = adminUtils.formatCurrency(response.todayAmount || 0);
+          document.getElementById('unconfigured-channels').textContent = response.unconfiguredChannels || 2;
+        } else {
+          adminUtils.showNotification('加载支付统计数据失败', 'error');
+        }
+      } catch (error) {
+        adminUtils.showNotification('加载支付统计数据时发生错误', 'error');
+        console.error('加载支付统计错误:', error);
+      }
+    }
+    
+    // 加载微信支付配置
+    async function loadWechatConfig() {
+      try {
+        const response = await adminUtils.apiRequest('/api/admin/payments/wechat');
+        
+        if (response && response.success) {
+          const config = response.config || {};
+          
+          document.getElementById('wechat-enabled').checked = config.enabled || false;
+          document.getElementById('wechat-app-id').value = config.appId || '';
+          document.getElementById('wechat-mch-id').value = config.mchId || '';
+          document.getElementById('wechat-secret-key').value = config.secretKey || '';
+          document.getElementById('wechat-notify-url').value = config.notifyUrl || '';
+          
+          document.getElementById('wechat-jsapi').checked = config.paymentMethods?.includes('jsapi') || false;
+          document.getElementById('wechat-native').checked = config.paymentMethods?.includes('native') || false;
+          document.getElementById('wechat-h5').checked = config.paymentMethods?.includes('h5') || false;
+          document.getElementById('wechat-mini').checked = config.paymentMethods?.includes('mini') || false;
+          
+          document.getElementById('wechat-cert-filename').textContent = config.certFile ? '已上传证书文件' : '未选择文件';
+        } else {
+          adminUtils.showNotification('加载微信支付配置失败', 'info');
+        }
+      } catch (error) {
+        adminUtils.showNotification('加载微信支付配置时发生错误', 'error');
+        console.error('加载微信支付配置错误:', error);
+      }
+    }
+    
+    // 加载支付宝配置
+    async function loadAlipayConfig() {
+      try {
+        const response = await adminUtils.apiRequest('/api/admin/payments/alipay');
+        
+        if (response && response.success) {
+          const config = response.config || {};
+          
+          document.getElementById('alipay-enabled').checked = config.enabled || false;
+          document.getElementById('alipay-app-id').value = config.appId || '';
+          document.getElementById('alipay-private-key').value = config.privateKey || '';
+          document.getElementById('alipay-public-key').value = config.publicKey || '';
+          document.getElementById('alipay-notify-url').value = config.notifyUrl || '';
+          document.getElementById('alipay-return-url').value = config.returnUrl || '';
+          
+          document.getElementById('alipay-web').checked = config.paymentMethods?.includes('web') || false;
+          document.getElementById('alipay-wap').checked = config.paymentMethods?.includes('wap') || false;
+          document.getElementById('alipay-app').checked = config.paymentMethods?.includes('app') || false;
+        } else {
+          adminUtils.showNotification('加载支付宝配置失败', 'info');
+        }
+      } catch (error) {
+        adminUtils.showNotification('加载支付宝配置时发生错误', 'error');
+        console.error('加载支付宝配置错误:', error);
+      }
+    }
+    
+    // 保存微信支付配置
+    async function saveWechatConfig() {
+      const formData = new FormData();
+      formData.append('enabled', document.getElementById('wechat-enabled').checked);
+      formData.append('appId', document.getElementById('wechat-app-id').value);
+      formData.append('mchId', document.getElementById('wechat-mch-id').value);
+      formData.append('secretKey', document.getElementById('wechat-secret-key').value);
+      formData.append('notifyUrl', document.getElementById('wechat-notify-url').value);
+      
+      const paymentMethods = [];
+      if (document.getElementById('wechat-jsapi').checked) paymentMethods.push('jsapi');
+      if (document.getElementById('wechat-native').checked) paymentMethods.push('native');
+      if (document.getElementById('wechat-h5').checked) paymentMethods.push('h5');
+      if (document.getElementById('wechat-mini').checked) paymentMethods.push('mini');
+      formData.append('paymentMethods', JSON.stringify(paymentMethods));
+      
+      const certFile = document.getElementById('wechat-cert-file').files[0];
+      if (certFile) {
+        formData.append('certFile', certFile);
+      }
+      
+      try {
+        adminUtils.showNotification('正在保存微信支付配置...', 'info');
+        
+        const response = await adminUtils.apiRequest('/api/admin/payments/wechat', {
+          method: 'POST',
+          body: formData,
+          isFormData: true
+        });
+        
+        if (response && response.success) {
+          adminUtils.showNotification('微信支付配置保存成功', 'success');
+          loadPaymentStats();
+        } else {
+          adminUtils.showNotification(response.message || '保存微信支付配置失败', 'error');
+        }
+      } catch (error) {
+        adminUtils.showNotification('保存微信支付配置时发生错误', 'error');
+        console.error('保存微信支付配置错误:', error);
+      }
+    }
+    
+    // 保存支付宝配置
+    async function saveAlipayConfig() {
+      const config = {
+        enabled: document.getElementById('alipay-enabled').checked,
+        appId: document.getElementById('alipay-app-id').value,
+        privateKey: document.getElementById('alipay-private-key').value,
+        publicKey: document.getElementById('alipay-public-key').value,
+        notifyUrl: document.getElementById('alipay-notify-url').value,
+        returnUrl: document.getElementById('alipay-return-url').value,
+        paymentMethods: []
+      };
+      
+      if (document.getElementById('alipay-web').checked) config.paymentMethods.push('web');
+      if (document.getElementById('alipay-wap').checked) config.paymentMethods.push('wap');
+      if (document.getElementById('alipay-app').checked) config.paymentMethods.push('app');
+      
+      try {
+        adminUtils.showNotification('正在保存支付宝配置...', 'info');
+        
+        const response = await adminUtils.apiRequest('/api/admin/payments/alipay', {
+          method: 'POST',
+          body: JSON.stringify(config)
+        });
+        
+        if (response && response.success) {
+          adminUtils.showNotification('支付宝配置保存成功', 'success');
+          loadPaymentStats();
+        } else {
+          adminUtils.showNotification(response.message || '保存支付宝配置失败', 'error');
+        }
+      } catch (error) {
+        adminUtils.showNotification('保存支付宝配置时发生错误', 'error');
+        console.error('保存支付宝配置错误:', error);
+      }
+    }
+    
+    // 测试微信支付连接
+    async function testWechatConnection() {
+      adminUtils.showNotification('正在测试微信支付连接...', 'info');
+      
+      try {
+        const response = await adminUtils.apiRequest('/api/admin/payments/wechat/test', {
+          method: 'POST',
+          body: JSON.stringify({
+            appId: document.getElementById('wechat-app-id').value,
+            mchId: document.getElementById('wechat-mch-id').value,
+            secretKey: document.getElementById('wechat-secret-key').value
+          })
+        });
+        
+        if (response && response.success) {
+          adminUtils.showNotification('微信支付连接测试成功', 'success');
+        } else {
+          adminUtils.showNotification(response.message || '微信支付连接测试失败', 'error');
+        }
+      } catch (error) {
+        adminUtils.showNotification('测试微信支付连接时发生错误', 'error');
+        console.error('测试微信支付连接错误:', error);
+      }
+    }
+    
+    // 测试支付宝连接
+    async function testAlipayConnection() {
+      adminUtils.showNotification('正在测试支付宝连接...', 'info');
+      
+      try {
+        const response = await adminUtils.apiRequest('/api/admin/payments/alipay/test', {
+          method: 'POST',
+          body: JSON.stringify({
+            appId: document.getElementById('alipay-app-id').value,
+            privateKey: document.getElementById('alipay-private-key').value,
+            publicKey: document.getElementById('alipay-public-key').value
+          })
+        });
+        
+        if (response && response.success) {
+          adminUtils.showNotification('支付宝连接测试成功', 'success');
+        } else {
+          adminUtils.showNotification(response.message || '支付宝连接测试失败', 'error');
+        }
+      } catch (error) {
+        adminUtils.showNotification('测试支付宝连接时发生错误', 'error');
+        console.error('测试支付宝连接错误:', error);
+      }
+    }
+    
+    // 切换微信支付启用状态
+    async function toggleWechatEnabled(enabled) {
+      try {
+        const response = await adminUtils.apiRequest('/api/admin/payments/wechat/toggle', {
+          method: 'POST',
+          body: JSON.stringify({ enabled })
+        });
+        
+        if (response && response.success) {
+          adminUtils.showNotification(`微信支付已${enabled ? '启用' : '禁用'}`, 'success');
+          loadPaymentStats();
+        } else {
+          document.getElementById('wechat-enabled').checked = !enabled;
+          adminUtils.showNotification(response.message || `${enabled ? '启用' : '禁用'}微信支付失败`, 'error');
+        }
+      } catch (error) {
+        document.getElementById('wechat-enabled').checked = !enabled;
+        adminUtils.showNotification(`${enabled ? '启用' : '禁用'}微信支付时发生错误`, 'error');
+        console.error(`${enabled ? '启用' : '禁用'}微信支付错误:`, error);
+      }
+    }
+    
+    // 切换支付宝启用状态
+    async function toggleAlipayEnabled(enabled) {
+      try {
+        const response = await adminUtils.apiRequest('/api/admin/payments/alipay/toggle', {
+          method: 'POST',
+          body: JSON.stringify({ enabled })
+        });
+        
+        if (response && response.success) {
+          adminUtils.showNotification(`支付宝已${enabled ? '启用' : '禁用'}`, 'success');
+          loadPaymentStats();
+        } else {
+          document.getElementById('alipay-enabled').checked = !enabled;
+          adminUtils.showNotification(response.message || `${enabled ? '启用' : '禁用'}支付宝失败`, 'error');
+        }
+      } catch (error) {
+        document.getElementById('alipay-enabled').checked = !enabled;
+        adminUtils.showNotification(`${enabled ? '启用' : '禁用'}支付宝时发生错误`, 'error');
+        console.error(`${enabled ? '启用' : '禁用'}支付宝错误:`, error);
+      }
+    }
+  </script>
+  
+  <style>
+    /* 提示框样式 */
+    .alert {
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+    }
+    
+    .alert-info {
+      background-color: #e8f4fd;
+      border-left: 4px solid #007bff;
+      color: #0c5890;
+    }
+    
+    .alert i {
+      font-size: 20px;
+      margin-right: 10px;
+    }
+    
+    /* 标签页样式 */
+    .tabs {
+      margin-top: 20px;
+    }
+    
+    .tab-header {
+      display: flex;
+      border-bottom: 1px solid #dee2e6;
+      margin-bottom: 20px;
+    }
+    
+    .tab {
+      padding: 12px 20px;
+      cursor: pointer !important;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+      font-weight: 500;
+      color: #6c757d;
+      position: relative;
+      z-index: 10;
+    }
+    
+    .tab:hover {
+      color: #007bff;
+    }
+    
+    .tab.active {
+      color: #007bff;
+      border-bottom-color: #007bff;
+    }
+    
+    .tab i {
+      margin-right: 8px;
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    /* 卡片样式 */
+    .card {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    
+    .card-header {
+      padding: 15px 20px;
+      background-color: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .card-header h3 {
+      margin: 0;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+    }
+    
+    .card-header h3 i {
+      margin-right: 10px;
+    }
+    
+    .card-body {
+      padding: 20px;
+    }
+    
+    /* 表单样式 */
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #495057;
+    }
+    
+    .form-group small {
+      display: block;
+      margin-top: 5px;
+      color: #6c757d;
+      font-size: 12px;
+    }
+    
+    .form-group input[type="text"],
+    .form-group input[type="url"],
+    .form-group input[type="password"],
+    .form-group textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    /* 密码textarea的样式 */
+    .password-textarea textarea {
+      font-family: sans-serif;
+    }
+    
+    .password-input, .password-textarea {
+      position: relative;
+    }
+    
+    .toggle-password {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #6c757d;
+      cursor: pointer;
+    }
+    
+    .password-textarea .toggle-password {
+      top: 15px;
+    }
+    
+    /* 文件上传样式 */
+    .file-upload {
+      display: flex;
+      align-items: center;
+    }
+    
+    .file-upload input[type="file"] {
+      display: none;
+    }
+    
+    .file-upload label {
+      display: inline-block;
+      padding: 8px 15px;
+      background-color: #f8f9fa;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      font-weight: normal;
+    }
+    
+    .file-upload label:hover {
+      background-color: #e9ecef;
+    }
+    
+    /* 复选框组样式 */
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    
+    .checkbox {
+      display: flex;
+      align-items: center;
+    }
+    
+    .checkbox input[type="checkbox"] {
+      margin-right: 6px;
+    }
+    
+    /* 开关样式 */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    
+    .toggle-input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-label {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+    
+    .toggle-label:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    .toggle-input:checked + .toggle-label {
+      background-color: #28a745;
+    }
+    
+    .toggle-input:checked + .toggle-label:before {
+      transform: translateX(26px);
+    }
+    
+    /* 按钮操作区域样式 */
+    .form-actions {
+      margin-top: 30px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+  </style>
+</body>
+</html>
