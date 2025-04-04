@@ -18,8 +18,8 @@ const config = {
   notifyUrl: process.env.WECHAT_NOTIFY_URL, // 支付结果通知回调地址
   // 测试模式判断
   isTestMode: process.env.PAYMENT_TEST_MODE === 'true',
-  // 沙箱模式判断，开发环境使用沙箱
-  isSandbox: process.env.NODE_ENV !== 'production'
+  // 强制使用正式环境API地址（微信已经取消了沙箱环境）
+  isSandbox: false
 };
 
 /**
@@ -169,9 +169,7 @@ export async function createWechatPayment(orderData) {
     console.log('请求XML数据:', xmlData);
     
     // 确定统一下单API地址
-    const unifiedOrderUrl = config.isSandbox 
-      ? 'https://api.mch.weixin.qq.com/sandboxnew/pay/unifiedorder'
-      : 'https://api.mch.weixin.qq.com/pay/unifiedorder';
+    const unifiedOrderUrl = 'https://api.mch.weixin.qq.com/pay/unifiedorder';
     console.log('请求API地址:', unifiedOrderUrl);
     
     console.log('正在发起HTTP请求...');
@@ -314,9 +312,7 @@ export async function queryOrderStatus(orderNumber) {
     console.log('请求XML数据:', xmlData);
     
     // 确定订单查询API地址
-    const orderQueryUrl = config.isSandbox
-      ? 'https://api.mch.weixin.qq.com/sandboxnew/pay/orderquery'
-      : 'https://api.mch.weixin.qq.com/pay/orderquery';
+    const orderQueryUrl = 'https://api.mch.weixin.qq.com/pay/orderquery';
     console.log('请求API地址:', orderQueryUrl);
     
     console.log('正在发起HTTP请求...');
@@ -433,9 +429,7 @@ export async function closeOrder(orderNumber) {
     console.log('请求XML数据:', xmlData);
     
     // 确定关闭订单API地址
-    const closeOrderUrl = config.isSandbox
-      ? 'https://api.mch.weixin.qq.com/sandboxnew/pay/closeorder'
-      : 'https://api.mch.weixin.qq.com/pay/closeorder';
+    const closeOrderUrl = 'https://api.mch.weixin.qq.com/pay/closeorder';
     console.log('请求API地址:', closeOrderUrl);
     
     console.log('正在发起HTTP请求...');
