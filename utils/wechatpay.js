@@ -14,9 +14,11 @@ const __dirname = path.dirname(__filename);
 const config = {
   appId: process.env.WECHAT_APP_ID, // 微信开放平台 appid
   mchId: process.env.WECHAT_MCH_ID, // 微信支付商户号
-  mchKey: process.env.WECHAT_MCH_KEY, // 商户API密钥
+  mchKey: process.env.WECHAT_API_KEY, // 商户API密钥，使用WECHAT_API_KEY
   notifyUrl: process.env.WECHAT_NOTIFY_URL, // 支付结果通知回调地址
-  // 开发环境使用沙箱环境，生产环境使用真实环境
+  // 测试模式判断
+  isTestMode: process.env.PAYMENT_TEST_MODE === 'true',
+  // 沙箱模式判断，开发环境使用沙箱
   isSandbox: process.env.NODE_ENV !== 'production'
 };
 
@@ -99,6 +101,20 @@ function objectToXML(obj) {
  */
 export async function createWechatPayment(orderData) {
   try {
+    // 测试模式下，直接返回模拟支付成功结果
+    if (config.isTestMode) {
+      console.log('测试模式：模拟创建微信支付订单');
+      return {
+        success: true,
+        codeUrl: 'weixin://wxpay/bizpayurl?pr=test_code_url',
+        orderNumber: orderData.orderNumber,
+        amount: orderData.amount,
+        timestamp: Math.floor(Date.now() / 1000),
+        nonceStr: generateNonceStr(),
+        isTestMode: true
+      };
+    }
+    
     // 构建统一下单参数
     const params = {
       appid: config.appId,
@@ -192,6 +208,25 @@ export function verifyNotifySign(notifyData) {
  */
 export async function queryOrderStatus(orderNumber) {
   try {
+    // 测试模式下，直接返回模拟支付成功结果
+    if (config.isTestMode) {
+      console.log('测试模式：模拟查询微信支付订单');
+      
+      // 50%的概率返回支付成功，模拟实际支付情况
+      const isPaid = Math.random() > 0.5;
+      
+      return {
+        success: true,
+        status: isPaid ? 'SUCCESS' : 'NOTPAY',
+        isPaid: isPaid,
+        transactionId: isPaid ? `test_${Date.now()}` : '',
+        orderNumber: orderNumber,
+        amount: 0,
+        timeEnd: isPaid ? new Date().toISOString().replace(/[-T:.Z]/g, '').substring(0, 14) : '',
+        isTestMode: true
+      };
+    }
+    
     // 构建查询参数
     const params = {
       appid: config.appId,
@@ -250,7 +285,7 @@ export async function queryOrderStatus(orderNumber) {
     console.error('查询微信支付订单出错:', error);
     return {
       success: false,
-      message: error.message || '查询订单状态失败',
+      message: error.message || '查询订单失败',
       error: error.toString()
     };
   }
@@ -263,6 +298,16 @@ export async function queryOrderStatus(orderNumber) {
  */
 export async function closeOrder(orderNumber) {
   try {
+    // 测试模式下，直接返回模拟关闭成功结果
+    if (config.isTestMode) {
+      console.log('测试模式：模拟关闭微信支付订单');
+      return {
+        success: true,
+        orderNumber: orderNumber,
+        isTestMode: true
+      };
+    }
+    
     // 构建关闭订单参数
     const params = {
       appid: config.appId,
@@ -294,8 +339,7 @@ export async function closeOrder(orderNumber) {
     if (result.return_code === 'SUCCESS' && result.result_code === 'SUCCESS') {
       return {
         success: true,
-        message: '订单关闭成功',
-        orderNumber
+        orderNumber: orderNumber
       };
     } else {
       return {
@@ -305,7 +349,7 @@ export async function closeOrder(orderNumber) {
       };
     }
   } catch (error) {
-    console.error('关闭微信订单出错:', error);
+    console.error('关闭微信支付订单出错:', error);
     return {
       success: false,
       message: error.message || '关闭订单失败',

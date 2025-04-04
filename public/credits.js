@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
           body: JSON.stringify({
             packageId: selectedPackage.id,
             amount: selectedPackage.credits,
-            paymentMethod: paymentMethod
+            paymentMethod: 'wechat' // 固定使用微信支付
           })
         });
         
