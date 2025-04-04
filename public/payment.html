@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>充值积分 - AI绘画平台</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .package-card {
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .package-card.selected {
+            border-color: #4263eb;
+            background-color: rgba(66, 99, 235, 0.05);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(66, 99, 235, 0.15);
+        }
+        
+        .package-card .discount-tag {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background-color: #fa5252;
+            color: white;
+            padding: 3px 8px;
+            font-size: 12px;
+            border-radius: 0 8px 0 8px;
+        }
+        
+        .payment-method {
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .payment-method.selected {
+            border-color: #4263eb;
+            background-color: rgba(66, 99, 235, 0.05);
+        }
+        
+        .payment-method img {
+            height: 40px;
+            object-fit: contain;
+        }
+        
+        .payment-qrcode {
+            max-width: 240px;
+            margin: 0 auto;
+        }
+        
+        .timer-container {
+            font-size: 14px;
+            color: #868e96;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(66, 99, 235, 0.3);
+            border-radius: 50%;
+            border-top-color: #4263eb;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        #orderStep, #paymentStep, #completeStep {
+            display: none;
+        }
+        
+        .payment-steps .step {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
+        
+        .payment-steps .step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            right: -50%;
+            top: 14px;
+            width: 100%;
+            height: 2px;
+            background-color: #e9ecef;
+            z-index: -1;
+        }
+        
+        .payment-steps .step.active .step-icon {
+            background-color: #4263eb;
+            color: white;
+        }
+        
+        .payment-steps .step.active::after {
+            background-color: #4263eb;
+        }
+        
+        .payment-steps .step.completed .step-icon {
+            background-color: #40c057;
+            color: white;
+        }
+        
+        .payment-steps .step.completed::after {
+            background-color: #40c057;
+        }
+        
+        .payment-steps .step-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #e9ecef;
+            color: #495057;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+        
+        .payment-steps .step-text {
+            font-size: 14px;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h2 class="mb-4">积分充值</h2>
+                
+                <!-- 步骤指示器 -->
+                <div class="payment-steps d-flex justify-content-between mb-5 mx-auto" style="max-width: 500px;">
+                    <div class="step active">
+                        <div class="step-icon">1</div>
+                        <div class="step-text">选择套餐</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">2</div>
+                        <div class="step-text">支付订单</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">3</div>
+                        <div class="step-text">充值完成</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 选择套餐 -->
+        <div id="packageStep">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-4">请选择充值套餐</h5>
+                            <div class="row" id="packageContainer">
+                                <div class="col-12 text-center py-5">
+                                    <div class="loading"></div>
+                                    <p class="mt-2">加载套餐信息...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-4">选择支付方式</h5>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="payment-method selected" data-method="wechat">
+                                        <div class="d-flex align-items-center">
+                                            <img src="https://cdn.jsdelivr.net/gh/twbs/icons/icons/wechat.svg" alt="微信支付" class="me-3">
+                                            <div>
+                                                <h6 class="mb-0">微信支付</h6>
+                                                <small class="text-muted">使用微信扫码支付</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="payment-method" data-method="alipay">
+                                        <div class="d-flex align-items-center">
+                                            <img src="https://cdn.jsdelivr.net/gh/twbs/icons/icons/alipay.svg" alt="支付宝" class="me-3">
+                                            <div>
+                                                <h6 class="mb-0">支付宝</h6>
+                                                <small class="text-muted">使用支付宝扫码支付</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-12 text-center">
+                    <button id="createOrderBtn" class="btn btn-primary btn-lg px-5" disabled>
+                        确认购买
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 支付订单 -->
+        <div id="orderStep">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title mb-4">订单信息</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>订单号:</strong> <span id="orderNumber"></span></p>
+                                    <p><strong>套餐名称:</strong> <span id="packageName"></span></p>
+                                    <p><strong>积分数量:</strong> <span id="creditAmount"></span>积分</p>
+                                    <p><strong>支付金额:</strong> <span id="payAmount"></span>元</p>
+                                    <p><strong>支付方式:</strong> <span id="payMethod"></span></p>
+                                    <p><strong>订单状态:</strong> <span id="orderStatus" class="text-warning">等待支付</span></p>
+                                    <p><strong>支付时间:</strong> <span id="payTime" class="timer-container"></span></p>
+                                </div>
+                                <div class="col-md-6 text-center">
+                                    <div class="mb-3 payment-qrcode" id="qrcodeContainer">
+                                        <div class="text-center py-5">
+                                            <div class="loading"></div>
+                                            <p class="mt-2">正在生成支付二维码...</p>
+                                        </div>
+                                    </div>
+                                    <p class="mb-1">请使用<span id="scanApp"></span>扫描二维码完成支付</p>
+                                    <p class="text-danger mb-3" id="expireMessage"></p>
+                                    <div class="d-flex justify-content-center">
+                                        <button id="checkStatusBtn" class="btn btn-outline-primary me-2">
+                                            <i class="fas fa-sync-alt"></i> 检查支付状态
+                                        </button>
+                                        <button id="cancelOrderBtn" class="btn btn-outline-secondary">
+                                            <i class="fas fa-times"></i> 取消订单
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12 text-center">
+                    <button id="backToPackagesBtn" class="btn btn-link">
+                        <i class="fas fa-arrow-left"></i> 返回套餐选择
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 支付完成 -->
+        <div id="completeStep">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-body text-center">
+                            <div class="mb-4">
+                                <i class="fas fa-check-circle text-success" style="font-size: 5rem;"></i>
+                            </div>
+                            <h4 class="mb-3">支付成功</h4>
+                            <p class="mb-1">您已成功充值 <span id="successCredits" class="fw-bold text-primary"></span> 积分</p>
+                            <p class="mb-4">订单号: <span id="successOrderNumber"></span></p>
+                            <div class="d-flex justify-content-center">
+                                <a href="/index.html" class="btn btn-outline-primary me-2">
+                                    <i class="fas fa-home"></i> 返回首页
+                                </a>
+                                <a href="/user/dashboard.html" class="btn btn-primary">
+                                    <i class="fas fa-user"></i> 进入个人中心
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <script src="/js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 验证登录状态
+            if (!isAuthenticated()) {
+                window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+                return;
+            }
+
+            // 全局变量
+            let selectedPackage = null;
+            let selectedPaymentMethod = 'wechat';
+            let currentOrder = null;
+            let orderTimer = null;
+            let statusCheckInterval = null;
+            
+            // 加载积分套餐
+            await loadPackages();
+            
+            // 处理支付方式选择
+            document.querySelectorAll('.payment-method').forEach(method => {
+                method.addEventListener('click', function() {
+                    document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('selected'));
+                    this.classList.add('selected');
+                    selectedPaymentMethod = this.dataset.method;
+                });
+            });
+            
+            // 创建订单按钮点击事件
+            document.getElementById('createOrderBtn').addEventListener('click', function() {
+                if (selectedPackage) {
+                    createOrder(selectedPackage.id, selectedPaymentMethod);
+                }
+            });
+            
+            // 检查支付状态按钮点击事件
+            document.getElementById('checkStatusBtn').addEventListener('click', function() {
+                if (currentOrder) {
+                    checkOrderStatus(currentOrder.orderNumber);
+                }
+            });
+            
+            // 取消订单按钮点击事件
+            document.getElementById('cancelOrderBtn').addEventListener('click', function() {
+                if (currentOrder) {
+                    cancelOrder(currentOrder.orderNumber);
+                }
+            });
+            
+            // 返回套餐选择按钮点击事件
+            document.getElementById('backToPackagesBtn').addEventListener('click', function() {
+                // 清除定时器
+                clearInterval(statusCheckInterval);
+                clearTimeout(orderTimer);
+                
+                // 重置当前订单
+                currentOrder = null;
+                
+                // 切换回套餐选择页面
+                showStep('packageStep');
+            });
+            
+            // 加载积分套餐
+            async function loadPackages() {
+                try {
+                    const response = await fetch('/api/payment/packages', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${getToken()}`
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success && data.packages && data.packages.length > 0) {
+                        renderPackages(data.packages);
+                    } else {
+                        document.getElementById('packageContainer').innerHTML = `
+                            <div class="col-12 text-center py-5">
+                                <p class="text-danger">加载套餐信息失败，请刷新页面重试</p>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    console.error('加载套餐信息错误:', error);
+                    document.getElementById('packageContainer').innerHTML = `
+                        <div class="col-12 text-center py-5">
+                            <p class="text-danger">加载套餐信息失败，请刷新页面重试</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            // 渲染套餐卡片
+            function renderPackages(packages) {
+                const container = document.getElementById('packageContainer');
+                container.innerHTML = '';
+                
+                packages.forEach(pkg => {
+                    const discountText = pkg.discount ? `立省${Math.round((1 - pkg.discount) * 100)}%` : '';
+                    const discountTag = pkg.discount ? `<span class="discount-tag">${discountText}</span>` : '';
+                    
+                    const card = document.createElement('div');
+                    card.className = 'col-md-4 col-lg-4 mb-3';
+                    card.innerHTML = `
+                        <div class="package-card p-3" data-id="${pkg.id}">
+                            ${discountTag}
+                            <h5 class="mb-2">${pkg.name}</h5>
+                            <p class="mb-2">${pkg.credits}积分</p>
+                            <p class="mb-0 fw-bold">¥${pkg.price.toFixed(2)}</p>
+                            <small class="text-muted">${pkg.description || ''}</small>
+                        </div>
+                    `;
+                    
+                    container.appendChild(card);
+                    
+                    // 添加套餐卡片点击事件
+                    card.querySelector('.package-card').addEventListener('click', function() {
+                        document.querySelectorAll('.package-card').forEach(p => p.classList.remove('selected'));
+                        this.classList.add('selected');
+                        selectedPackage = packages.find(p => p.id === parseInt(this.dataset.id));
+                        document.getElementById('createOrderBtn').disabled = false;
+                    });
+                });
+            }
+            
+            // 创建订单
+            async function createOrder(packageId, paymentMethod) {
+                try {
+                    // 禁用按钮
+                    document.getElementById('createOrderBtn').disabled = true;
+                    document.getElementById('createOrderBtn').innerHTML = '<div class="loading me-2"></div> 创建订单中...';
+                    
+                    // 发送创建订单请求
+                    const response = await fetch('/api/payment/create-order', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${getToken()}`
+                        },
+                        body: JSON.stringify({
+                            packageId,
+                            paymentMethod
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 保存当前订单信息
+                        currentOrder = {
+                            orderNumber: data.order.orderNumber,
+                            amount: data.order.amount,
+                            credits: data.order.credits,
+                            paymentMethod: data.order.paymentMethod,
+                            expiredAt: data.order.expiredAt,
+                            packageName: data.package.name
+                        };
+                        
+                        // 显示支付信息
+                        document.getElementById('orderNumber').textContent = currentOrder.orderNumber;
+                        document.getElementById('packageName').textContent = currentOrder.packageName;
+                        document.getElementById('creditAmount').textContent = currentOrder.credits;
+                        document.getElementById('payAmount').textContent = currentOrder.amount.toFixed(2);
+                        document.getElementById('payMethod').textContent = currentOrder.paymentMethod === 'wechat' ? '微信支付' : '支付宝';
+                        document.getElementById('scanApp').textContent = currentOrder.paymentMethod === 'wechat' ? '微信' : '支付宝';
+                        
+                        // 生成二维码
+                        const qrcodeContainer = document.getElementById('qrcodeContainer');
+                        qrcodeContainer.innerHTML = '';
+                        
+                        if (data.payment.success && data.payment.codeUrl) {
+                            // 使用qrcode.js库生成二维码
+                            await QRCode.toCanvas(qrcodeContainer, data.payment.codeUrl, {
+                                width: 200,
+                                margin: 2,
+                                color: {
+                                    dark: '#000000',
+                                    light: '#ffffff'
+                                }
+                            });
+                        } else {
+                            qrcodeContainer.innerHTML = `
+                                <div class="alert alert-danger">
+                                    生成支付二维码失败: ${data.payment.message || '未知错误'}
+                                </div>
+                            `;
+                        }
+                        
+                        // 开始倒计时
+                        startOrderTimer(new Date(currentOrder.expiredAt));
+                        
+                        // 设置定时查询支付状态
+                        statusCheckInterval = setInterval(() => {
+                            checkOrderStatus(currentOrder.orderNumber);
+                        }, 5000); // 每5秒检查一次支付状态
+                        
+                        // 切换到支付页面
+                        showStep('orderStep');
+                        
+                    } else {
+                        // 显示错误信息
+                        alert('创建订单失败: ' + (data.message || '未知错误'));
+                        
+                        // 重置按钮状态
+                        document.getElementById('createOrderBtn').disabled = false;
+                        document.getElementById('createOrderBtn').innerHTML = '确认购买';
+                    }
+                } catch (error) {
+                    console.error('创建订单错误:', error);
+                    
+                    // 显示错误信息
+                    alert('创建订单失败: ' + (error.message || '未知错误'));
+                    
+                    // 重置按钮状态
+                    document.getElementById('createOrderBtn').disabled = false;
+                    document.getElementById('createOrderBtn').innerHTML = '确认购买';
+                }
+            }
+            
+            // 显示指定步骤
+            function showStep(stepId) {
+                document.getElementById('packageStep').style.display = 'none';
+                document.getElementById('orderStep').style.display = 'none';
+                document.getElementById('completeStep').style.display = 'none';
+                
+                document.getElementById(stepId).style.display = 'block';
+                
+                // 更新步骤指示器
+                const steps = document.querySelectorAll('.payment-steps .step');
+                steps.forEach((step, index) => {
+                    step.classList.remove('active', 'completed');
+                    
+                    if (stepId === 'packageStep' && index === 0) {
+                        step.classList.add('active');
+                    } else if (stepId === 'orderStep' && index === 1) {
+                        step.classList.add('active');
+                        if (index < 1) step.classList.add('completed');
+                    } else if (stepId === 'completeStep' && index === 2) {
+                        step.classList.add('active');
+                        if (index < 2) step.classList.add('completed');
+                    }
+                });
+            }
+            
+            // 开始订单倒计时
+            function startOrderTimer(expireDate) {
+                // 清除之前的定时器
+                clearTimeout(orderTimer);
+                
+                // 更新倒计时显示
+                function updateTimer() {
+                    const now = new Date();
+                    const timeLeft = expireDate - now;
+                    
+                    if (timeLeft <= 0) {
+                        // 订单已过期
+                        document.getElementById('payTime').textContent = '已过期';
+                        document.getElementById('expireMessage').textContent = '订单已过期，请重新创建订单';
+                        clearInterval(statusCheckInterval);
+                        return;
+                    }
+                    
+                    // 计算剩余分钟和秒数
+                    const minutes = Math.floor(timeLeft / 60000);
+                    const seconds = Math.floor((timeLeft % 60000) / 1000);
+                    
+                    // 更新显示
+                    document.getElementById('payTime').textContent = `${minutes}分${seconds}秒后过期`;
+                    
+                    if (timeLeft <= 300000) { // 5分钟内
+                        document.getElementById('expireMessage').textContent = '请尽快完成支付，订单即将过期';
+                    }
+                    
+                    // 继续倒计时
+                    orderTimer = setTimeout(updateTimer, 1000);
+                }
+                
+                // 开始定时器
+                updateTimer();
+            }
+            
+            // 查询订单状态
+            async function checkOrderStatus(orderNumber) {
+                try {
+                    const response = await fetch(`/api/payment/order-status/${orderNumber}`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${getToken()}`
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 根据订单状态处理
+                        if (data.status === 'paid') {
+                            // 清除定时器
+                            clearInterval(statusCheckInterval);
+                            clearTimeout(orderTimer);
+                            
+                            // 显示成功信息
+                            document.getElementById('successCredits').textContent = data.credits;
+                            document.getElementById('successOrderNumber').textContent = data.orderNumber;
+                            
+                            // 切换到支付完成页面
+                            showStep('completeStep');
+                            
+                        } else if (data.status === 'expired' || data.status === 'cancelled' || data.status === 'failed') {
+                            // 清除定时器
+                            clearInterval(statusCheckInterval);
+                            clearTimeout(orderTimer);
+                            
+                            // 显示失败信息
+                            document.getElementById('orderStatus').textContent = 
+                                data.status === 'expired' ? '已过期' : 
+                                data.status === 'cancelled' ? '已取消' : '支付失败';
+                            document.getElementById('orderStatus').className = 'text-danger';
+                            
+                            document.getElementById('expireMessage').textContent = 
+                                data.status === 'expired' ? '订单已过期，请重新创建订单' : 
+                                data.status === 'cancelled' ? '订单已取消，请重新创建订单' : '支付失败，请重新创建订单';
+                            
+                            // 禁用按钮
+                            document.getElementById('checkStatusBtn').disabled = true;
+                            document.getElementById('cancelOrderBtn').disabled = true;
+                            
+                        } else if (data.status === 'pending') {
+                            // 更新倒计时
+                            if (data.expiresIn !== undefined) {
+                                const minutes = Math.floor(data.expiresIn / 60);
+                                const seconds = data.expiresIn % 60;
+                                document.getElementById('payTime').textContent = `${minutes}分${seconds}秒后过期`;
+                                
+                                if (data.expiresIn <= 300) { // 5分钟内
+                                    document.getElementById('expireMessage').textContent = '请尽快完成支付，订单即将过期';
+                                }
+                            }
+                        }
+                    } else {
+                        console.error('查询订单状态失败:', data.message);
+                    }
+                } catch (error) {
+                    console.error('查询订单状态错误:', error);
+                }
+            }
+            
+            // 取消订单
+            async function cancelOrder(orderNumber) {
+                if (!confirm('确定要取消此订单吗？')) {
+                    return;
+                }
+                
+                try {
+                    // 禁用按钮
+                    document.getElementById('cancelOrderBtn').disabled = true;
+                    document.getElementById('cancelOrderBtn').innerHTML = '<div class="loading me-2"></div> 取消中...';
+                    
+                    // 发送取消订单请求
+                    const response = await fetch(`/api/payment/cancel-order/${orderNumber}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${getToken()}`
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 清除定时器
+                        clearInterval(statusCheckInterval);
+                        clearTimeout(orderTimer);
+                        
+                        // 更新订单状态
+                        document.getElementById('orderStatus').textContent = '已取消';
+                        document.getElementById('orderStatus').className = 'text-secondary';
+                        document.getElementById('expireMessage').textContent = '订单已取消，请重新创建订单';
+                        
+                        // 禁用按钮
+                        document.getElementById('checkStatusBtn').disabled = true;
+                        document.getElementById('cancelOrderBtn').disabled = true;
+                        
+                        // 显示成功消息
+                        alert('订单已成功取消');
+                    } else {
+                        // 显示错误信息
+                        alert('取消订单失败: ' + (data.message || '未知错误'));
+                        
+                        // 重置按钮状态
+                        document.getElementById('cancelOrderBtn').disabled = false;
+                        document.getElementById('cancelOrderBtn').innerHTML = '<i class="fas fa-times"></i> 取消订单';
+                    }
+                } catch (error) {
+                    console.error('取消订单错误:', error);
+                    
+                    // 显示错误信息
+                    alert('取消订单失败: ' + (error.message || '未知错误'));
+                    
+                    // 重置按钮状态
+                    document.getElementById('cancelOrderBtn').disabled = false;
+                    document.getElementById('cancelOrderBtn').innerHTML = '<i class="fas fa-times"></i> 取消订单';
+                }
+            }
+        });
+    </script>
+</body>
+</html> 

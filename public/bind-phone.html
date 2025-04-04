@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>绑定手机号 - 图像生成平台</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background-color: #f8f9fa;
+    }
+
+    .phone-verification-container {
+      max-width: 500px;
+      width: 100%;
+      padding: 30px;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-title {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .phone-input-group {
+      display: flex;
+    }
+
+    .verification-code-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .verification-code-input {
+      flex: 1;
+    }
+
+    .error-message {
+      color: #dc3545;
+      font-size: 14px;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .timer {
+      font-size: 14px;
+      color: #6c757d;
+    }
+
+    .skip-btn {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+
+    .skip-btn a {
+      color: #6c757d;
+      text-decoration: none;
+    }
+
+    .skip-btn a:hover {
+      color: #495057;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="phone-verification-container">
+    <h1 class="form-title">绑定手机号</h1>
+    <p class="text-center mb-4">为了账户安全，请绑定您的手机号码</p>
+
+    <div class="form-group">
+      <label for="phoneNumber" class="form-label">手机号码</label>
+      <div class="input-group">
+        <span class="input-group-text">+86</span>
+        <input type="tel" class="form-control" id="phoneNumber" placeholder="请输入您的手机号码" maxlength="11">
+      </div>
+      <div class="error-message" id="phoneError"></div>
+    </div>
+
+    <div class="form-group">
+      <label for="verificationCode" class="form-label">验证码</label>
+      <div class="verification-code-group">
+        <input type="text" class="form-control verification-code-input" id="verificationCode" placeholder="请输入验证码" maxlength="6">
+        <button class="btn btn-primary" id="sendCodeBtn">获取验证码</button>
+      </div>
+      <div class="error-message" id="codeError"></div>
+    </div>
+
+    <button class="btn btn-primary w-100" id="bindBtn">确认绑定</button>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // 检查用户是否已登录
+      checkAuthentication();
+
+      // DOM 元素
+      const phoneNumberInput = document.getElementById('phoneNumber');
+      const verificationCodeInput = document.getElementById('verificationCode');
+      const sendCodeBtn = document.getElementById('sendCodeBtn');
+      const bindBtn = document.getElementById('bindBtn');
+      const phoneError = document.getElementById('phoneError');
+      const codeError = document.getElementById('codeError');
+
+      let countdown = 0;
+      let countdownTimer = null;
+
+      // 检查是否已经登录
+      async function checkAuthentication() {
+        try {
+          const response = await fetch('/api/auth/me');
+          const data = await response.json();
+
+          if (!data.success) {
+            // 未登录，重定向到登录页
+            window.location.href = '/login.html';
+            return;
+          }
+
+          // 已经验证过手机号，跳转到首页
+          if (data.user.phoneVerified) {
+            window.location.href = '/index.html';
+          }
+        } catch (error) {
+          console.error('验证登录状态出错:', error);
+          window.location.href = '/login.html';
+        }
+      }
+
+      // 验证手机号格式
+      function validatePhone(phone) {
+        return /^1[3456789]\d{9}$/.test(phone);
+      }
+
+      // 开始倒计时
+      function startCountdown() {
+        countdown = 60;
+        sendCodeBtn.disabled = true;
+        sendCodeBtn.textContent = `${countdown}秒后重发`;
+
+        countdownTimer = setInterval(() => {
+          countdown--;
+          sendCodeBtn.textContent = `${countdown}秒后重发`;
+
+          if (countdown <= 0) {
+            clearInterval(countdownTimer);
+            sendCodeBtn.disabled = false;
+            sendCodeBtn.textContent = '获取验证码';
+          }
+        }, 1000);
+      }
+
+      // 发送验证码
+      sendCodeBtn.addEventListener('click', async () => {
+        const phoneNumber = phoneNumberInput.value.trim();
+
+        // 验证手机号
+        if (!phoneNumber) {
+          phoneError.textContent = '请输入手机号码';
+          phoneError.style.display = 'block';
+          return;
+        }
+
+        if (!validatePhone(phoneNumber)) {
+          phoneError.textContent = '手机号格式不正确';
+          phoneError.style.display = 'block';
+          return;
+        }
+
+        phoneError.style.display = 'none';
+
+        try {
+          const response = await fetch('/api/sms/send-verification-code', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ phoneNumber: '+86' + phoneNumber })
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            startCountdown();
+            // 开发环境下，如果返回了验证码，自动填充
+            if (result.code) {
+              verificationCodeInput.value = result.code;
+            }
+          } else {
+            phoneError.textContent = result.message || '发送验证码失败';
+            phoneError.style.display = 'block';
+          }
+        } catch (error) {
+          console.error('发送验证码出错:', error);
+          phoneError.textContent = '发送验证码出错，请稍后再试';
+          phoneError.style.display = 'block';
+        }
+      });
+
+      // 绑定手机号
+      bindBtn.addEventListener('click', async () => {
+        const phoneNumber = phoneNumberInput.value.trim();
+        const code = verificationCodeInput.value.trim();
+
+        // 验证输入
+        let hasError = false;
+
+        if (!phoneNumber) {
+          phoneError.textContent = '请输入手机号码';
+          phoneError.style.display = 'block';
+          hasError = true;
+        } else if (!validatePhone(phoneNumber)) {
+          phoneError.textContent = '手机号格式不正确';
+          phoneError.style.display = 'block';
+          hasError = true;
+        } else {
+          phoneError.style.display = 'none';
+        }
+
+        if (!code) {
+          codeError.textContent = '请输入验证码';
+          codeError.style.display = 'block';
+          hasError = true;
+        } else {
+          codeError.style.display = 'none';
+        }
+
+        if (hasError) {
+          return;
+        }
+
+        // 提交绑定请求
+        try {
+          bindBtn.disabled = true;
+          bindBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...';
+
+          const response = await fetch('/api/sms/bind-phone', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              phoneNumber: '+86' + phoneNumber,
+              code: code
+            }),
+            credentials: 'include'
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            // 绑定成功
+            alert('手机号绑定成功！');
+            window.location.href = '/index.html';
+          } else {
+            // 绑定失败
+            codeError.textContent = result.message || '验证码错误或已过期';
+            codeError.style.display = 'block';
+            bindBtn.disabled = false;
+            bindBtn.textContent = '确认绑定';
+          }
+        } catch (error) {
+          console.error('绑定手机号出错:', error);
+          codeError.textContent = '绑定失败，请稍后再试';
+          codeError.style.display = 'block';
+          bindBtn.disabled = false;
+          bindBtn.textContent = '确认绑定';
+        }
+      });
+    });
+  </script>
+</body>
+
+</html> 

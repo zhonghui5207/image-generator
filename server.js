@@ -13,6 +13,8 @@ import mongoose from './models/db.js';
 import authRoutes from './routes/authRoutes.js';
 import creditRoutes from './routes/creditRoutes.js';
 import imageHistoryRoutes from './routes/imageHistoryRoutes.js';
+import smsRoutes from './routes/smsRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 
 // 导入中间件和工具
 import { authenticate, checkCredits } from './utils/auth.js';
@@ -71,6 +73,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/credits', creditRoutes);
 app.use('/api/history', imageHistoryRoutes);
+app.use('/api/sms', smsRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // Helper function to convert image to base64
 function image2Base64(imagePath) {
@@ -278,6 +282,7 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         // 处理图像 URL 提取和API返回的提示词
         let generatedImageUrl = '';
         let apiPrompt = '';
+        let isGenerationFailed = false;
         
         console.log('处理图像 URL 提取，原始结果:', fullContent);
         
@@ -306,14 +311,17 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         if (!generatedImageUrl) {
           console.log('未找到图像 URL，使用原始图像作为占位');
           generatedImageUrl = originalImagePath;
+          isGenerationFailed = true; // 标记为生成失败
         }
         
-        // 扣除用户积分
+        // 扣除用户积分 - 根据生成结果调整积分消耗
+        const actualCreditsToUse = isGenerationFailed ? 1 : creditsToUse; // 如果生成失败，只扣1积分
+        
         const newCreditBalance = await useCredits(
           req.user._id, 
-          creditsToUse,
-          `生成图像 (${selectedModel})`,
-          null
+          actualCreditsToUse,  // 使用调整后的积分数量
+          isGenerationFailed ? `生成图像失败 (${selectedModel})` : `生成图像 (${selectedModel})`, 
+          imageHistory._id
         );
         
         // 保存生成历史记录
@@ -322,8 +330,10 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           generatedImage: generatedImageUrl,
           prompt: prompt,
           model: selectedModel,
-          creditsUsed: creditsToUse,
-          mode: mode
+          creditsUsed: isGenerationFailed ? 1 : creditsToUse, // 如果生成失败，只扣1积分
+          mode: mode,
+          status: isGenerationFailed ? 'failed' : 'success', // 添加状态
+          errorMessage: isGenerationFailed ? '未能生成有效图像' : null // 添加错误消息
         };
         
         // 只有图生图模式才添加原始图像
@@ -361,8 +371,9 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
             apiPrompt: apiPrompt, // 发送API返回的英文提示词
             userPrompt: prompt, // 发送用户输入的原始提示词
             translatedPrompt: translatedPrompt,
+            generationFailed: isGenerationFailed, // 添加生成失败标记
             credits: {
-              used: creditsToUse,
+              used: actualCreditsToUse, // 返回实际扣除的积分
               remaining: newCreditBalance
             },
             historyId: generatedImage._id
@@ -424,6 +435,7 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         
         // 从响应中提取图像 URL
         let generatedImageUrl = '';
+        let isGenerationFailed = false;
         
         if (response.choices && response.choices.length > 0) {
           const result = response.choices[0].message.content;
@@ -457,10 +469,11 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           console.log('提取的图像 URL:', generatedImageUrl);
         }
         
-        // 如果没有找到图像 URL，使用原始图像作为占位
+        // 如果没有找到图像 URL，使用原始图像作为占位，并标记生成失败
         if (!generatedImageUrl) {
           console.log('未找到图像 URL，使用原始图像作为占位');
           generatedImageUrl = originalImagePath;
+          isGenerationFailed = true; // 标记为生成失败
         }
         
         // 保存生成历史记录
@@ -469,8 +482,10 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           generatedImage: generatedImageUrl,
           prompt: prompt,
           model: selectedModel,
-          creditsUsed: creditsToUse,
-          mode: mode
+          creditsUsed: isGenerationFailed ? 1 : creditsToUse, // 如果生成失败，只扣1积分
+          mode: mode,
+          status: isGenerationFailed ? 'failed' : 'success', // 添加状态
+          errorMessage: isGenerationFailed ? '未能生成有效图像' : null // 添加错误消息
         };
         
         // 只有图生图模式才添加原始图像
@@ -485,11 +500,13 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           console.error('保存历史记录失败:', err);
         });
         
-        // 扣除用户积分
+        // 扣除用户积分 - 根据生成结果调整积分消耗
+        const actualCreditsToUse = isGenerationFailed ? 1 : creditsToUse; // 如果生成失败，只扣1积分
+        
         const newCreditBalance = await useCredits(
           req.user._id, 
-          creditsToUse,  // 使用实际消耗的积分数量
-          `生成图像 (${selectedModel})`, 
+          actualCreditsToUse,  // 使用调整后的积分数量
+          isGenerationFailed ? `生成图像失败 (${selectedModel})` : `生成图像 (${selectedModel})`, 
           imageHistory._id
         );
         
@@ -498,8 +515,9 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           success: true, 
           result: response.choices[0].message.content,
           originalImage: originalImagePath,
+          generationFailed: isGenerationFailed, // 添加生成失败标记
           credits: {
-            used: creditsToUse,
+            used: actualCreditsToUse, // 返回实际扣除的积分
             remaining: newCreditBalance
           },
           updatedCredits: newCreditBalance, // 添加更新后的积分，方便前端直接使用
@@ -538,13 +556,69 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         console.error('请检查您的网络连接和代理设置');
       }
       
-      // 只在尚未发送响应时发送错误响应
-      if (!res.headersSent) {
-        res.status(statusCode).json({ 
-          error: errorMessage, 
-          details: apiError.message,
-          apiResponse: apiError.response?.data || null
-        });
+      try {
+        // API错误时，也保存一条失败的生成记录
+        if (!res.headersSent) {
+          // 生成失败时只扣除1积分
+          const failureCreditsToUse = 1;
+          
+          // 保存失败的生成历史记录
+          const failedImageData = {
+            user: req.user._id,
+            generatedImage: originalImagePath || '', // 使用原始图像或空字符串
+            prompt: prompt,
+            model: selectedModel,
+            creditsUsed: failureCreditsToUse,
+            mode: mode,
+            status: 'failed',
+            errorMessage: errorMessage
+          };
+          
+          // 如果是图生图模式且有原始图像，添加原始图像
+          if (mode === 'image-to-image' && originalImagePath) {
+            failedImageData.originalImage = originalImagePath;
+          }
+          
+          // 保存失败记录
+          const failedImage = new GeneratedImage(failedImageData);
+          await failedImage.save().catch(err => {
+            console.error('保存失败历史记录错误:', err);
+          });
+          
+          // 扣除1积分
+          const newCreditBalance = await useCredits(
+            req.user._id,
+            failureCreditsToUse,
+            `生成图像失败 (${selectedModel}) - ${errorMessage}`,
+            failedImage._id
+          ).catch(err => {
+            console.error('扣除积分错误:', err);
+            return req.user.credits - failureCreditsToUse; // 如果扣积分失败，估算新余额
+          });
+          
+          res.status(statusCode).json({ 
+            error: errorMessage,
+            details: apiError.message,
+            apiResponse: apiError.response?.data || null,
+            generationFailed: true,
+            credits: {
+              used: failureCreditsToUse,
+              remaining: newCreditBalance
+            }
+          });
+        }
+      } catch (creditError) {
+        console.error('处理API错误时积分处理失败:', creditError);
+        
+        // 只在尚未发送响应时发送错误响应
+        if (!res.headersSent) {
+          res.status(statusCode).json({ 
+            error: errorMessage, 
+            details: apiError.message,
+            apiResponse: apiError.response?.data || null,
+            generationFailed: true
+          });
+        }
       }
     }
     

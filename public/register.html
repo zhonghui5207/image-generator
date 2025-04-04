@@ -86,5 +86,64 @@
     
     <script src="auth.js"></script>
     <script src="auth-ui.js"></script>
+    
+    <script>
+    // 提交注册表单
+    registerForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const username = document.getElementById('username').value;
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirm-password').value;
+        
+        // 验证输入
+        if (!username || !email || !password || !confirmPassword) {
+            displayError('请填写所有必填项');
+            return;
+        }
+        
+        if (password !== confirmPassword) {
+            displayError('两次输入的密码不一致');
+            return;
+        }
+        
+        try {
+            const submitButton = registerForm.querySelector('button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 注册中...';
+            
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    password: password
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // 注册成功，引导绑定手机号
+                window.location.href = '/bind-phone.html';
+            } else {
+                displayError(data.message || '注册失败');
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
+            }
+        } catch (error) {
+            console.error('注册错误:', error);
+            displayError('注册时出错，请稍后再试');
+            const submitButton = registerForm.querySelector('button[type="submit"]');
+            submitButton.disabled = false;
+            submitButton.innerHTML = '注册';
+        }
+    });
+    </script>
 </body>
 </html>

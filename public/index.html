@@ -237,5 +237,15 @@
 
     <script src="script.js"></script>
     <script src="auth-ui.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+      // 页面加载时检查用户是否已绑定手机号
+      document.addEventListener('DOMContentLoaded', async () => {
+        // 检查用户是否已绑定手机号
+        await auth.checkPhoneVerification();
+        
+        // 加载其他页面内容...
+      });
+    </script>
 </body>
 </html>

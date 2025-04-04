@@ -43,7 +43,9 @@ router.post('/register', async (req, res) => {
         username: user.username,
         email: user.email,
         credits: user.credits,
-        isAdmin: user.isAdmin
+        isAdmin: user.isAdmin,
+        phoneVerified: user.phoneVerified,
+        needPhoneVerification: true
       }
     });
   } catch (error) {
@@ -91,7 +93,9 @@ router.post('/login', async (req, res) => {
         username: user.username,
         email: user.email,
         credits: user.credits,
-        isAdmin: user.isAdmin
+        isAdmin: user.isAdmin,
+        phoneNumber: user.phoneNumber,
+        phoneVerified: user.phoneVerified
       }
     });
   } catch (error) {
@@ -111,6 +115,8 @@ router.get('/me', authenticate, async (req, res) => {
         email: req.user.email,
         credits: req.user.credits,
         isAdmin: req.user.isAdmin,
+        phoneNumber: req.user.phoneNumber,
+        phoneVerified: req.user.phoneVerified,
         createdAt: req.user.createdAt
       }
     });
@@ -143,6 +149,8 @@ router.get('/profile', authenticate, async (req, res) => {
         email: req.user.email,
         credits: req.user.credits,
         isAdmin: req.user.isAdmin,
+        phoneNumber: req.user.phoneNumber,
+        phoneVerified: req.user.phoneVerified,
         createdAt: req.user.createdAt
       },
       generationCount: generationCount // 返回生成次数

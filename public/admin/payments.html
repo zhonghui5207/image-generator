@@ -232,7 +232,7 @@
                 <div class="form-group">
                   <label for="alipay-private-key">应用私钥</label>
                   <div class="password-textarea">
-                    <textarea id="alipay-private-key" placeholder="支付宝应用私钥" rows="3" required style="-webkit-text-security: disc;"></textarea>
+                    <textarea id="alipay-private-key" placeholder="支付宝应用私钥" rows="3" required></textarea>
                     <button type="button" class="toggle-password">
                       <i class="fas fa-eye"></i>
                     </button>
@@ -347,24 +347,12 @@
       document.querySelectorAll('.toggle-password').forEach(btn => {
         btn.addEventListener('click', function() {
           const input = this.parentElement.querySelector('input, textarea');
-          const icon = this.querySelector('i');
-          
-          if (input.tagName.toLowerCase() === 'textarea') {
-            if (input.style.webkitTextSecurity === 'none' || !input.style.webkitTextSecurity) {
-              input.style.webkitTextSecurity = 'disc';
-              icon.classList.replace('fa-eye-slash', 'fa-eye');
-            } else {
-              input.style.webkitTextSecurity = 'none';
-              icon.classList.replace('fa-eye', 'fa-eye-slash');
-            }
+          if (input.type === 'password') {
+            input.type = 'text';
+            this.querySelector('i').classList.replace('fa-eye', 'fa-eye-slash');
           } else {
-            if (input.type === 'password') {
-              input.type = 'text';
-              icon.classList.replace('fa-eye', 'fa-eye-slash');
-            } else {
-              input.type = 'password';
-              icon.classList.replace('fa-eye-slash', 'fa-eye');
-            }
+            input.type = 'password';
+            this.querySelector('i').classList.replace('fa-eye-slash', 'fa-eye');
           }
         });
       });
@@ -682,13 +670,11 @@
     
     .tab {
       padding: 12px 20px;
-      cursor: pointer !important;
+      cursor: pointer;
       border-bottom: 2px solid transparent;
       transition: all 0.2s;
       font-weight: 500;
       color: #6c757d;
-      position: relative;
-      z-index: 10;
     }
     
     .tab:hover {
@@ -778,11 +764,6 @@
     .form-group textarea {
       resize: vertical;
       min-height: 80px;
-    }
-    
-    /* 密码textarea的样式 */
-    .password-textarea textarea {
-      font-family: sans-serif;
     }
     
     .password-input, .password-textarea {

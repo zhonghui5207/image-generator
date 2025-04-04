@@ -22,6 +22,16 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
+  phoneNumber: {
+    type: String,
+    sparse: true,
+    unique: true,
+    trim: true
+  },
+  phoneVerified: {
+    type: Boolean,
+    default: false
+  },
   credits: {
     type: Number,
     default: 10, // 新用户赠送10积分

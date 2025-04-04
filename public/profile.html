@@ -9,6 +9,22 @@
     <link rel="stylesheet" href="nav-styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="profile.css">
+    <style>
+        /* 手机号验证状态样式 */
+        .badge {
+            display: inline-block;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        .badge-success {
+            background-color: #28a745;
+            color: white;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -37,6 +53,7 @@
                             <div class="user-details">
                                 <p><strong>用户名:</strong> <span id="username"></span></p>
                                 <p><strong>邮箱:</strong> <span id="email"></span></p>
+                                <p><strong>手机号:</strong> <span id="phone-number">未绑定</span> <span id="phone-status" class="badge badge-success" style="display: none;">已验证</span></p>
                                 <p><strong>注册时间:</strong> <span id="created-at"></span></p>
                                 <p><strong>生成次数:</strong> <span id="generation-count">0</span></p>
                             </div>

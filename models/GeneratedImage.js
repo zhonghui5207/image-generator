@@ -35,6 +35,15 @@ const generatedImageSchema = new mongoose.Schema({
   model: {
     type: String,
     required: true
+  },
+  status: {
+    type: String,
+    enum: ['success', 'failed', 'pending'],
+    default: 'success'
+  },
+  errorMessage: {
+    type: String,
+    required: false
   }
 });
 

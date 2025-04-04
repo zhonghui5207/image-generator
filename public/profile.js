@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // 获取DOM元素 - 用户信息
   const usernameElement = document.getElementById('username');
   const emailElement = document.getElementById('email');
+  const phoneNumberElement = document.getElementById('phone-number');
+  const phoneStatusElement = document.getElementById('phone-status');
   const creditsElement = document.getElementById('credits');
   const createdAtElement = document.getElementById('created-at');
   const creditsAmountElement = document.getElementById('credits-amount');
@@ -145,6 +147,20 @@ document.addEventListener('DOMContentLoaded', function() {
   function initUserInfo() {
     if (usernameElement) usernameElement.textContent = user.username || '';
     if (emailElement) emailElement.textContent = user.email || '';
+    
+    // 显示手机号信息
+    if (phoneNumberElement && user.phoneNumber) {
+      phoneNumberElement.textContent = maskPhoneNumber(user.phoneNumber) || '未绑定';
+      if (phoneStatusElement && user.phoneVerified) {
+        phoneStatusElement.style.display = 'inline-block';
+      } else if (phoneStatusElement) {
+        phoneStatusElement.style.display = 'none';
+      }
+    } else if (phoneNumberElement) {
+      phoneNumberElement.textContent = '未绑定';
+      if (phoneStatusElement) phoneStatusElement.style.display = 'none';
+    }
+    
     if (creditsElement) creditsElement.textContent = user.credits || 0;
     if (creditsAmountElement) creditsAmountElement.textContent = user.credits || 0;
     if (displayUsernameElement) displayUsernameElement.textContent = user.username || '';
@@ -156,10 +172,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
+  // 掩码显示手机号，只显示前3位和后4位
+  function maskPhoneNumber(phoneNumber) {
+    if (!phoneNumber) return '';
+    
+    // 移除可能的+86前缀
+    let phone = phoneNumber.replace(/^\+86/, '');
+    
+    if (phone.length >= 7) {
+      return phone.substring(0, 3) + '****' + phone.substring(phone.length - 4);
+    } else {
+      return phone;
+    }
+  }
+  
   // 获取用户信息
   async function fetchUserProfile() {
     try {
-      const response = await fetch('/api/auth/profile', {
+      const response = await fetch('/api/auth/me', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -174,9 +204,20 @@ document.addEventListener('DOMContentLoaded', function() {
         // 更新用户信息显示
         initUserInfo();
         
-        // 更新生成次数显示
-        if (generationCountElement && data.generationCount) {
-          generationCountElement.textContent = data.generationCount;
+        // 获取生成次数信息
+        const profileResponse = await fetch('/api/auth/profile', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          // 更新生成次数显示
+          if (generationCountElement && profileData.generationCount) {
+            generationCountElement.textContent = profileData.generationCount;
+          }
         }
       } else if (response.status === 401) {
         // 认证失败，重定向到登录页面
