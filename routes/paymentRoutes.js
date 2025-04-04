@@ -22,9 +22,9 @@ function generateOrderNumber() {
 router.get('/packages', (req, res) => {
   // 从环境变量或配置文件中读取套餐信息
   const creditPackages = [
-    { id: 1, credits: 10, price: 1.00, name: '新手体验包', description: '体验AI绘画的魅力' },
-    { id: 2, credits: 50, price: 4.50, name: '创意入门包', discount: 0.9, description: '适合轻度使用' },
-    { id: 3, credits: 100, price: 8.00, name: '创作者套餐', discount: 0.8, description: '高性价比的选择' },
+    { id: 1, credits: 100, price: 9.9, name: '基础套餐', description: '体验AI绘画的魅力' },
+    { id: 2, credits: 500, price: 39.9, name: '标准套餐', discount: 0.9, description: '适合轻度使用' },
+    { id: 3, credits: 1200, price: 99.9, name: '高级套餐', discount: 0.8, description: '高性价比的选择' },
     { id: 4, credits: 200, price: 15.00, name: '专业套餐', discount: 0.75, description: '专业创作者首选' },
     { id: 5, credits: 500, price: 35.00, name: 'AI画师套餐', discount: 0.7, description: '大量创作的理想选择' },
     { id: 6, credits: 1000, price: 65.00, name: '工作室套餐', discount: 0.65, description: '为团队和工作室设计' }
@@ -45,12 +45,12 @@ router.post('/create-order', authenticate, async (req, res) => {
     
     // 获取套餐信息
     const creditPackages = [
-      { id: 1, credits: 10, price: 1.00, name: '新手体验包' },
-      { id: 2, credits: 50, price: 4.50, name: '创意入门包', discount: 0.9 },
-      { id: 3, credits: 100, price: 8.00, name: '创作者套餐', discount: 0.8 },
-      { id: 4, credits: 200, price: 15.00, name: '专业套餐', discount: 0.75 },
-      { id: 5, credits: 500, price: 35.00, name: 'AI画师套餐', discount: 0.7 },
-      { id: 6, credits: 1000, price: 65.00, name: '工作室套餐', discount: 0.65 }
+      { id: 1, credits: 100, price: 9.9, name: '基础套餐', description: '体验AI绘画的魅力' },
+      { id: 2, credits: 500, price: 39.9, name: '标准套餐', discount: 0.9, description: '适合轻度使用' },
+      { id: 3, credits: 1200, price: 99.9, name: '高级套餐', discount: 0.8, description: '高性价比的选择' },
+      { id: 4, credits: 200, price: 15.00, name: '专业套餐', discount: 0.75, description: '专业创作者首选' },
+      { id: 5, credits: 500, price: 35.00, name: 'AI画师套餐', discount: 0.7, description: '大量创作的理想选择' },
+      { id: 6, credits: 1000, price: 65.00, name: '工作室套餐', discount: 0.65, description: '为团队和工作室设计' }
     ];
     
     const selectedPackage = creditPackages.find(pkg => pkg.id === parseInt(packageId));

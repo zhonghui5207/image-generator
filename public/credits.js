@@ -101,8 +101,22 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!selectedPackage) return;
       
       try {
-        // 获取选中的积分包ID（数字型）
-        const packageId = parseInt(selectedPackage.id, 10);
+        // 套餐ID映射：将字符串ID映射到数字ID
+        let packageId;
+        switch (selectedPackage.id) {
+          case 'basic':
+            packageId = 1;
+            break;
+          case 'standard':
+            packageId = 2;
+            break;
+          case 'premium':
+            packageId = 3;
+            break;
+          default:
+            alert('无效的套餐ID');
+            return;
+        }
         
         // 发送购买请求到支付系统创建订单
         const response = await fetch('/api/payment/create-order', {
