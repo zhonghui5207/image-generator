@@ -100,42 +100,29 @@ document.addEventListener('DOMContentLoaded', function() {
     confirmPaymentBtn.addEventListener('click', async function() {
       if (!selectedPackage) return;
       
-      const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
-      
       try {
-        // 发送购买请求
-        const response = await fetch('/api/credits/purchase', {
+        // 发送购买请求到支付系统创建订单
+        const response = await fetch('/api/payment/create-order', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             packageId: selectedPackage.id,
-            amount: selectedPackage.credits,
             paymentMethod: 'wechat' // 固定使用微信支付
           })
         });
         
         const data = await response.json();
         
-        if (response.ok) {
-          // 更新用户积分
-          user.credits = data.newBalance;
-          localStorage.setItem('user', JSON.stringify(user));
-          
-          // 更新页面显示
-          creditsAmount.textContent = data.newBalance;
-          
-          // 关闭模态框
+        if (response.ok && data.success) {
+          // 关闭当前模态框
           paymentModal.style.display = 'none';
           
-          // 显示成功消息
-          alert(`购买成功！您已获得 ${selectedPackage.credits} 积分，当前积分余额: ${data.newBalance}`);
-          
-          // 刷新交易历史
-          fetchTransactionHistory();
+          // 打开二维码支付页面
+          window.location.href = `/payment.html?order=${data.order.orderNumber}`;
         } else {
-          alert(`购买失败: ${data.message || '请稍后再试'}`);
+          alert(`创建订单失败: ${data.message || '请稍后再试'}`);
         }
       } catch (error) {
         console.error('购买积分错误:', error);
