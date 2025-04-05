@@ -750,6 +750,11 @@ document.addEventListener('DOMContentLoaded', () => {
                   
                   // 立即将图像 URL 设置到图像元素
                   if (generatedImageUrl && generatedImage) {
+                    generatedImage.onload = function() {
+                      // 图像加载完成后检查并更新UI状态
+                      checkAndUpdateUIState();
+                    };
+                    
                     generatedImage.src = generatedImageUrl;
                     if (downloadImageBtn) {
                       downloadImageBtn.href = generatedImageUrl;
@@ -826,15 +831,13 @@ document.addEventListener('DOMContentLoaded', () => {
       uploadForm.parentElement.hidden = false;
       resultContainer.hidden = true;
     } finally {
-      // 如果生成成功，完成进度条并隐藏加载指示器
+      // 如果生成成功，完成进度条
       if (generatedImageUrl) {
         updateProgress(100, '生成完成！');
         // 延迟隐藏加载指示器
         setTimeout(() => {
           loadingIndicator.style.display = 'none';
-          // 确保结果容器显示
-          resultContainer.hidden = false;
-          uploadForm.parentElement.hidden = true;
+          // 不自动显示结果容器，等待图像加载完成后再显示
         }, 500);
       }
     }
@@ -1217,11 +1220,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // 检查生成的图像是否有效
     const isGeneratedImageValid = generatedImage && generatedImage.src && 
                                   generatedImage.src !== '#' && 
-                                  generatedImage.src !== 'about:blank';
+                                  generatedImage.src !== 'about:blank' &&
+                                  generatedImage.complete && 
+                                  generatedImage.naturalWidth > 0;
     
-    // 如果图像有效但结果容器被隐藏，则显示结果容器
-    if (isGeneratedImageValid && resultContainer.hidden) {
-      console.log('检测到有效的生成图像，但结果容器被隐藏，正在修复UI状态');
+    // 只有当图像有效且已经加载完成时才显示结果容器
+    if (isGeneratedImageValid && resultContainer.hidden && 
+        generatedImage.getAttribute('src').includes('generated')) {
+      console.log('检测到有效的生成图像，显示结果');
       resultContainer.hidden = false;
       uploadForm.parentElement.hidden = true;
       
@@ -1234,7 +1240,4 @@ document.addEventListener('DOMContentLoaded', () => {
       loadingIndicator.style.display = 'none';
     }
   }
-  
-  // 定期检查UI状态
-  setInterval(checkAndUpdateUIState, 1000);
 });
