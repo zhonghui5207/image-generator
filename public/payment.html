@@ -262,11 +262,13 @@
                     </div>
                 </div>
             </div>
-            <div class="row">
+
+            <!-- 订单信息页面底部链接 -->
+            <div class="row mt-4 mb-5">
                 <div class="col-12 text-center">
-                    <button id="backToPackagesBtn" class="btn btn-link">
+                    <a href="/credits.html" class="btn btn-primary px-4">
                         <i class="fas fa-arrow-left"></i> 返回套餐选择
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>
@@ -361,19 +363,6 @@
                 if (currentOrder) {
                     cancelOrder(currentOrder.orderNumber);
                 }
-            });
-            
-            // 返回套餐选择按钮点击事件
-            document.getElementById('backToPackagesBtn').addEventListener('click', function() {
-                // 清除定时器
-                clearInterval(statusCheckInterval);
-                clearTimeout(orderTimer);
-                
-                // 重置当前订单
-                currentOrder = null;
-                
-                // 切换回套餐选择页面
-                showStep('packageStep');
             });
             
             // 加载订单信息

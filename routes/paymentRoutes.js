@@ -265,17 +265,34 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
     // 获取支付二维码URL
     let paymentResult;
     
-    if (order.paymentMethod === 'wechat') {
-      // 调用微信支付获取二维码
-      paymentResult = await createWechatPayment({
-        orderNumber,
-        amount: order.amount,
-        body: order.description || `AI绘画平台-积分充值`,
-        ip: req.ip
-      });
-    } else if (order.paymentMethod === 'alipay') {
-      // 调用支付宝支付（这里需要再实现）
-      paymentResult = { success: false, message: '支付宝支付功能尚未实现' };
+    // 检查订单元数据中是否已经存储了二维码URL
+    if (order.metadata && order.metadata.codeUrl) {
+      // 使用已存储的二维码URL
+      paymentResult = {
+        success: true,
+        codeUrl: order.metadata.codeUrl
+      };
+    } else {
+      // 没有存储二维码URL，生成新的支付二维码
+      if (order.paymentMethod === 'wechat') {
+        // 调用微信支付获取二维码
+        paymentResult = await createWechatPayment({
+          orderNumber,
+          amount: order.amount,
+          body: order.description || `AI绘画平台-积分充值`,
+          ip: req.ip
+        });
+        
+        // 如果成功获取了二维码URL，保存到订单元数据中
+        if (paymentResult.success && paymentResult.codeUrl) {
+          order.metadata = order.metadata || {};
+          order.metadata.codeUrl = paymentResult.codeUrl;
+          await order.save();
+        }
+      } else if (order.paymentMethod === 'alipay') {
+        // 调用支付宝支付（这里需要再实现）
+        paymentResult = { success: false, message: '支付宝支付功能尚未实现' };
+      }
     }
     
     // 获取套餐信息
