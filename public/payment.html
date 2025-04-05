@@ -481,16 +481,38 @@
                     if (data.payment && data.payment.success && data.payment.codeUrl) {
                         console.log(`订单 ${orderNumber} 成功获取二维码URL: ${data.payment.codeUrl.substring(0, 30)}...`);
                         try {
+                            // 显示加载中提示
+                            qrcodeContainer.innerHTML = `
+                                <div class="text-center py-2 mb-3">
+                                    <div class="loading"></div>
+                                    <p class="mt-2">正在生成二维码...</p>
+                                </div>
+                            `;
+                            
                             // 使用qrcode.js库生成二维码
-                            await QRCode.toCanvas(qrcodeContainer, data.payment.codeUrl, {
-                                width: 200,
+                            const canvas = document.createElement('canvas');
+                            // 设置更大尺寸，提高扫码成功率
+                            await QRCode.toCanvas(canvas, data.payment.codeUrl, {
+                                width: 240,
                                 margin: 2,
                                 color: {
                                     dark: '#000000',
                                     light: '#ffffff'
-                                }
+                                },
+                                errorCorrectionLevel: 'H' // 使用高级纠错
                             });
+                            
+                            // 清除加载提示
+                            qrcodeContainer.innerHTML = '';
+                            qrcodeContainer.appendChild(canvas);
+                            
                             console.log(`订单 ${orderNumber} 的二维码已成功生成`);
+                            
+                            // 添加提示
+                            const tipElement = document.createElement('div');
+                            tipElement.className = 'text-center mt-2';
+                            tipElement.innerHTML = '<small class="text-muted">打开微信扫一扫</small>';
+                            qrcodeContainer.appendChild(tipElement);
                             
                             // 开始倒计时
                             startOrderTimer(new Date(currentOrder.expiredAt));
@@ -507,6 +529,9 @@
                                     <button class="btn btn-primary mt-3" id="reloadQrBtn">
                                         <i class="fas fa-sync-alt"></i> 重新获取二维码
                                     </button>
+                                    <button class="btn btn-outline-secondary mt-3 ms-2" id="manualOpenBtn">
+                                        <i class="fas fa-external-link-alt"></i> 手动打开支付
+                                    </button>
                                 </div>
                             `;
                             
@@ -516,6 +541,21 @@
                                 this.innerHTML = '<div class="loading me-2"></div> 正在重新获取...';
                                 loadOrderInfo(orderNumber);
                             });
+                            
+                            // 添加手动打开支付链接的按钮
+                            const manualOpenBtn = document.getElementById('manualOpenBtn');
+                            if (manualOpenBtn) {
+                                manualOpenBtn.addEventListener('click', function() {
+                                    // 创建一个临时链接元素
+                                    const link = document.createElement('a');
+                                    link.href = data.payment.codeUrl;
+                                    link.target = '_blank';
+                                    link.rel = 'noopener noreferrer';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                });
+                            }
                         }
                     } else if (data.payment && data.payment.isPaid) {
                         // 订单已支付完成

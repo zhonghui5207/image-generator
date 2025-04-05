@@ -512,7 +512,25 @@ export function setOrderProvider(providerFn) {
  * @returns {Promise<Object>} 订单信息
  */
 async function getLocalOrder(orderNumber) {
-  return await orderProviderFn(orderNumber);
+  try {
+    console.log(`尝试从本地数据库获取订单信息: ${orderNumber}`);
+    const order = await orderProviderFn(orderNumber);
+    
+    if (!order) {
+      console.log(`未找到订单: ${orderNumber}`);
+      return null;
+    }
+    
+    console.log(`成功获取订单信息 ${orderNumber}, 检查metadata:`, 
+      order.metadata ? '存在metadata' : '无metadata',
+      order.metadata?.codeUrl ? `包含codeUrl: ${order.metadata.codeUrl.substring(0, 30)}...` : '不包含codeUrl'
+    );
+    
+    return order;
+  } catch (error) {
+    console.error(`获取本地订单信息错误:`, error);
+    return null;
+  }
 }
 
 /**

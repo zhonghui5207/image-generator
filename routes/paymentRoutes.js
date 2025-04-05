@@ -145,11 +145,37 @@ router.post('/create-order', authenticate, async (req, res) => {
         
         // 如果支付接口调用成功，保存二维码URL
         if (paymentResult.success && paymentResult.codeUrl) {
-          console.log(`成功获取订单 ${orderNumber} 的二维码URL, 正在保存到数据库...`);
-          order.metadata = order.metadata || {};
+          console.log(`成功获取订单 ${orderNumber} 的二维码URL: ${paymentResult.codeUrl.substring(0, 30)}...，正在保存到数据库...`);
+          
+          // 确保metadata初始化正确
+          if (!order.metadata) {
+            order.metadata = {};
+          }
+          
+          // 保存二维码URL
           order.metadata.codeUrl = paymentResult.codeUrl;
+          
+          // 保存到数据库
           await order.save();
-          console.log(`订单 ${orderNumber} 的二维码URL已成功保存到数据库`);
+          
+          // 验证保存是否成功
+          const verifyOrder = await Order.findOne({ orderNumber }).lean();
+          if (verifyOrder && verifyOrder.metadata && verifyOrder.metadata.codeUrl) {
+            console.log(`订单 ${orderNumber} 的二维码URL已成功保存到数据库，验证成功`);
+          } else {
+            console.error(`订单 ${orderNumber} 的二维码URL保存失败，metadata:`, 
+              verifyOrder ? (verifyOrder.metadata ? JSON.stringify(verifyOrder.metadata) : '无metadata') : '未找到订单');
+            
+            // 尝试使用替代方法更新
+            await Order.findOneAndUpdate(
+              { orderNumber }, 
+              { $set: { "metadata.codeUrl": paymentResult.codeUrl } }
+            );
+            
+            // 再次验证
+            const reverifyOrder = await Order.findOne({ orderNumber }).lean();
+            console.log(`再次验证: ${reverifyOrder?.metadata?.codeUrl ? '保存成功' : '保存失败'}`);
+          }
         } else if (paymentResult.success && paymentResult.isPaid) {
           // 如果订单已支付，更新订单状态
           console.log(`订单 ${orderNumber} 已支付，更新订单状态`);
@@ -340,12 +366,18 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
   try {
     const { orderNumber } = req.params;
     
-    // 从数据库查询订单
-    const order = await Order.findOne({ orderNumber });
+    // 从数据库查询订单，确保获取所有字段包括metadata
+    const order = await Order.findOne({ orderNumber }).lean();
     
     if (!order) {
+      console.log(`未找到订单: ${orderNumber}`);
       return res.status(404).json({ success: false, message: '订单不存在' });
     }
+    
+    // 输出订单信息用于调试
+    console.log(`获取到订单: ${orderNumber}, metadata:`, 
+      order.metadata ? JSON.stringify(order.metadata).substring(0, 100) + '...' : '无metadata'
+    );
     
     // 检查是否是当前用户的订单
     if (order.user.toString() !== req.user._id.toString()) {
@@ -374,21 +406,21 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
     
     // 先检查订单元数据是否已经有二维码URL
     if (order.metadata && order.metadata.codeUrl) {
-      console.log(`订单 ${orderNumber} 在数据库中已存储二维码URL: ${order.metadata.codeUrl}，直接使用`);
+      console.log(`订单 ${orderNumber} 在数据库中已存储二维码URL: ${order.metadata.codeUrl.substring(0, 30)}...，直接使用`);
       paymentResult = {
         success: true,
         codeUrl: order.metadata.codeUrl,
         message: '从数据库获取已存在的支付码'
       };
     } else {
-      console.log(`订单 ${orderNumber} 在数据库中没有存储二维码URL，尝试查询支付状态`);
+      console.log(`订单 ${orderNumber} 在数据库中没有存储二维码URL (metadata: ${JSON.stringify(order.metadata || {})}), 尝试查询支付状态`);
       
       // 首先尝试查询订单在支付平台的状态
       if (order.paymentMethod === 'wechat') {
         try {
           console.log(`查询订单 ${orderNumber} 在微信支付平台的状态`);
           const statusResult = await queryOrderStatus(orderNumber);
-          console.log(`订单 ${orderNumber} 状态查询结果:`, statusResult);
+          console.log(`订单 ${orderNumber} 状态查询结果:`, JSON.stringify(statusResult));
           
           // 如果查询成功并且支付已完成
           if (statusResult.success && statusResult.isPaid) {
@@ -397,7 +429,11 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
             order.status = 'paid';
             order.transactionId = statusResult.transactionId;
             order.paymentTime = new Date();
-            await order.save();
+            await Order.findOneAndUpdate({ orderNumber }, {
+              status: 'paid',
+              transactionId: statusResult.transactionId,
+              paymentTime: new Date()
+            });
             
             // 给用户添加积分
             await addCredits(order.user, order.credits, `购买积分 - 订单号:${order.orderNumber}`);
@@ -432,9 +468,16 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
             // 先检查返回结果中是否有二维码URL
             if (statusResult.codeUrl) {
               console.log(`微信支付平台返回了订单 ${orderNumber} 的二维码URL，保存并使用`);
-              order.metadata = order.metadata || {};
-              order.metadata.codeUrl = statusResult.codeUrl;
-              await order.save();
+              
+              // 更新订单metadata
+              await Order.findOneAndUpdate(
+                { orderNumber }, 
+                { 
+                  $set: { 
+                    "metadata.codeUrl": statusResult.codeUrl 
+                  } 
+                }
+              );
               
               paymentResult = {
                 success: true,
@@ -454,10 +497,17 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
                 
                 if (newPaymentResult.success && newPaymentResult.codeUrl) {
                   // 保存新获取的二维码
-                  console.log(`成功为订单 ${orderNumber} 获取到新的二维码URL，保存到数据库`);
-                  order.metadata = order.metadata || {};
-                  order.metadata.codeUrl = newPaymentResult.codeUrl;
-                  await order.save();
+                  console.log(`成功为订单 ${orderNumber} 获取到新的二维码URL: ${newPaymentResult.codeUrl.substring(0, 30)}...，保存到数据库`);
+                  
+                  // 更新订单metadata
+                  await Order.findOneAndUpdate(
+                    { orderNumber }, 
+                    { 
+                      $set: { 
+                        "metadata.codeUrl": newPaymentResult.codeUrl 
+                      } 
+                    }
+                  );
                   
                   paymentResult = newPaymentResult;
                 } else if (newPaymentResult.message && (newPaymentResult.message.includes('订单号重复') || newPaymentResult.needRetry)) {
@@ -476,6 +526,17 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
           // 查询失败不阻止后续流程
         }
       }
+    }
+    
+    // 再次从数据库获取最新的订单信息，确保拿到最新的metadata
+    const updatedOrder = await Order.findOne({ orderNumber }).lean();
+    if (updatedOrder?.metadata?.codeUrl && !paymentResult) {
+      console.log(`从更新的订单中找到了二维码URL: ${updatedOrder.metadata.codeUrl.substring(0, 30)}...`);
+      paymentResult = {
+        success: true,
+        codeUrl: updatedOrder.metadata.codeUrl,
+        message: '从数据库获取最新保存的支付码'
+      };
     }
     
     // 如果没有获取到二维码URL，并且需要重试，推荐创建新订单
@@ -509,12 +570,23 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
           
           // 如果成功获取了二维码URL，保存到订单元数据中
           if (newPaymentResult.success && newPaymentResult.codeUrl) {
-            console.log(`成功为订单 ${orderNumber} 创建支付并获取二维码URL，保存到数据库`);
-            order.metadata = order.metadata || {};
-            order.metadata.codeUrl = newPaymentResult.codeUrl;
-            await order.save();
+            console.log(`成功为订单 ${orderNumber} 创建支付并获取二维码URL: ${newPaymentResult.codeUrl.substring(0, 30)}...，保存到数据库`);
+            
+            // 更新订单metadata
+            await Order.findOneAndUpdate(
+              { orderNumber }, 
+              { 
+                $set: { 
+                  "metadata.codeUrl": newPaymentResult.codeUrl 
+                } 
+              }
+            );
             
             paymentResult = newPaymentResult;
+            
+            // 保存后再次确认是否已保存成功
+            const verifyOrder = await Order.findOne({ orderNumber }).lean();
+            console.log(`验证二维码URL是否保存成功: ${verifyOrder?.metadata?.codeUrl ? '成功' : '失败'}`);
           } else {
             paymentResult = newPaymentResult;
           }
@@ -545,23 +617,27 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
           paymentResult = { 
             success: false, 
             message: error.message || '生成支付二维码失败',
-            error: error
+            error: error.toString()
           };
         }
       }
     }
     
     // 获取套餐信息
-    const packageInfo = order.metadata || {};
+    const packageInfo = updatedOrder?.metadata || order.metadata || {};
     
     // 如果有支付结果，检查它是否包含isPaid标志
     if (paymentResult && paymentResult.isPaid) {
       console.log(`订单 ${orderNumber} 已支付，更新状态并返回支付成功信息`);
       // 更新订单为已支付
-      order.status = 'paid';
-      order.transactionId = paymentResult.transactionId || '';
-      order.paymentTime = new Date();
-      await order.save();
+      await Order.findOneAndUpdate(
+        { orderNumber },
+        {
+          status: 'paid',
+          transactionId: paymentResult.transactionId || '',
+          paymentTime: new Date()
+        }
+      );
       
       // 给用户添加积分
       await addCredits(order.user, order.credits, `购买积分 - 订单号:${order.orderNumber}`);
@@ -579,7 +655,7 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
           credits: order.credits,
           paymentMethod: order.paymentMethod,
           status: 'paid',
-          paymentTime: order.paymentTime
+          paymentTime: new Date()
         },
         payment: {
           success: true,
@@ -593,8 +669,7 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
     const now = new Date();
     if (order.expiredAt && now > order.expiredAt) {
       console.log(`订单 ${orderNumber} 已过期，更新状态`);
-      order.status = 'expired';
-      await order.save();
+      await Order.findOneAndUpdate({ orderNumber }, { status: 'expired' });
       
       return res.json({
         success: false,
@@ -609,7 +684,7 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
     }
     
     // 返回订单信息和支付二维码
-    console.log(`返回订单 ${orderNumber} 的信息和支付二维码`);
+    console.log(`返回订单 ${orderNumber} 的信息和支付二维码${paymentResult?.success ? ': ' + paymentResult.codeUrl.substring(0, 30) + '...' : ': 无'}`);
     res.json({
       success: paymentResult ? paymentResult.success : false,
       order: {
