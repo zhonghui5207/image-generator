@@ -231,6 +231,81 @@ router.get('/order-status/:orderNumber', authenticate, async (req, res) => {
   }
 });
 
+// 获取订单信息（用于支付页面）
+router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
+  try {
+    const { orderNumber } = req.params;
+    
+    // 从数据库查询订单
+    const order = await Order.findOne({ orderNumber });
+    
+    if (!order) {
+      return res.status(404).json({ success: false, message: '订单不存在' });
+    }
+    
+    // 检查是否是当前用户的订单
+    if (order.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: '无权访问此订单' });
+    }
+    
+    // 如果订单状态不是 pending，则无法继续支付
+    if (order.status !== 'pending') {
+      return res.json({
+        success: false,
+        message: `订单状态为 ${order.status}，无法继续支付`,
+        order: {
+          orderNumber: order.orderNumber,
+          amount: order.amount,
+          credits: order.credits,
+          status: order.status
+        }
+      });
+    }
+    
+    // 获取支付二维码URL
+    let paymentResult;
+    
+    if (order.paymentMethod === 'wechat') {
+      // 调用微信支付获取二维码
+      paymentResult = await createWechatPayment({
+        orderNumber,
+        amount: order.amount,
+        body: order.description || `AI绘画平台-积分充值`,
+        ip: req.ip
+      });
+    } else if (order.paymentMethod === 'alipay') {
+      // 调用支付宝支付（这里需要再实现）
+      paymentResult = { success: false, message: '支付宝支付功能尚未实现' };
+    }
+    
+    // 获取套餐信息
+    const packageInfo = order.metadata || {};
+    
+    // 返回订单信息和支付二维码
+    res.json({
+      success: true,
+      order: {
+        orderNumber: order.orderNumber,
+        amount: order.amount,
+        credits: order.credits,
+        paymentMethod: order.paymentMethod,
+        expiredAt: order.expiredAt,
+        status: order.status,
+        packageName: packageInfo.packageName || '积分充值'
+      },
+      payment: paymentResult,
+      package: {
+        id: packageInfo.packageId,
+        name: packageInfo.packageName || '积分充值'
+      }
+    });
+    
+  } catch (error) {
+    console.error('获取订单信息错误:', error);
+    res.status(500).json({ success: false, message: '获取订单信息失败', error: error.message });
+  }
+});
+
 // 取消订单
 router.post('/cancel-order/:orderNumber', authenticate, async (req, res) => {
   try {

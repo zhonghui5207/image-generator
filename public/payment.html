@@ -379,6 +379,24 @@
             // 加载订单信息
             async function loadOrderInfo(orderNumber) {
                 try {
+                    // 显示加载状态
+                    const qrcodeContainer = document.getElementById('qrcodeContainer');
+                    qrcodeContainer.innerHTML = `
+                        <div class="text-center py-4">
+                            <div class="loading"></div>
+                            <p class="mt-2">正在获取订单支付信息...</p>
+                        </div>
+                    `;
+                    
+                    // 显示订单步骤页面，避免空白界面
+                    showStep('orderStep');
+                    
+                    // 设置步骤指示器状态
+                    const steps = document.querySelectorAll('.payment-steps .step');
+                    steps[0].classList.add('completed');
+                    steps[0].classList.remove('active');
+                    steps[1].classList.add('active');
+                    
                     const response = await fetch(`/api/payment/order-info/${orderNumber}`, {
                         method: 'GET',
                         headers: {
@@ -386,32 +404,66 @@
                         }
                     });
                     
+                    // 检查响应状态
+                    if (!response.ok) {
+                        throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        throw new Error('返回的不是JSON格式数据');
+                    }
+                    
                     const data = await response.json();
                     
-                    if (data.success) {
-                        // 保存当前订单信息
-                        currentOrder = {
-                            orderNumber: data.order.orderNumber,
-                            amount: data.order.amount,
-                            credits: data.order.credits,
-                            paymentMethod: data.order.paymentMethod,
-                            expiredAt: data.order.expiredAt,
-                            packageName: data.order.packageName || data.package.name
-                        };
+                    // 检查订单是否存在并可以支付
+                    if (!data.success) {
+                        // 显示错误信息
+                        qrcodeContainer.innerHTML = `
+                            <div class="alert alert-danger">
+                                ${data.message || '获取订单信息失败'}
+                            </div>
+                        `;
                         
-                        // 显示支付信息
-                        document.getElementById('orderNumber').textContent = currentOrder.orderNumber;
-                        document.getElementById('packageName').textContent = currentOrder.packageName;
-                        document.getElementById('creditAmount').textContent = currentOrder.credits;
-                        document.getElementById('payAmount').textContent = currentOrder.amount.toFixed(2);
-                        document.getElementById('payMethod').textContent = currentOrder.paymentMethod === 'wechat' ? '微信支付' : '支付宝';
-                        document.getElementById('scanApp').textContent = currentOrder.paymentMethod === 'wechat' ? '微信' : '支付宝';
+                        // 如果有订单信息，显示基本信息
+                        if (data.order) {
+                            document.getElementById('orderNumber').textContent = data.order.orderNumber;
+                            document.getElementById('packageName').textContent = data.order.packageName || '未知套餐';
+                            document.getElementById('creditAmount').textContent = data.order.credits || '0';
+                            document.getElementById('payAmount').textContent = data.order.amount?.toFixed(2) || '0.00';
+                            document.getElementById('orderStatus').textContent = getStatusText(data.order.status);
+                            document.getElementById('orderStatus').className = getStatusClass(data.order.status);
+                        }
                         
-                        // 生成二维码
-                        const qrcodeContainer = document.getElementById('qrcodeContainer');
-                        qrcodeContainer.innerHTML = '';
-                        
-                        if (data.payment && data.payment.codeUrl) {
+                        document.getElementById('checkStatusBtn').disabled = true;
+                        document.getElementById('cancelOrderBtn').disabled = true;
+                        document.getElementById('expireMessage').textContent = '此订单无法继续支付';
+                        return;
+                    }
+                    
+                    // 保存当前订单信息
+                    currentOrder = {
+                        orderNumber: data.order.orderNumber,
+                        amount: data.order.amount,
+                        credits: data.order.credits,
+                        paymentMethod: data.order.paymentMethod,
+                        expiredAt: data.order.expiredAt,
+                        packageName: data.order.packageName || data.package.name
+                    };
+                    
+                    // 显示支付信息
+                    document.getElementById('orderNumber').textContent = currentOrder.orderNumber;
+                    document.getElementById('packageName').textContent = currentOrder.packageName;
+                    document.getElementById('creditAmount').textContent = currentOrder.credits;
+                    document.getElementById('payAmount').textContent = currentOrder.amount.toFixed(2);
+                    document.getElementById('payMethod').textContent = currentOrder.paymentMethod === 'wechat' ? '微信支付' : '支付宝';
+                    document.getElementById('scanApp').textContent = currentOrder.paymentMethod === 'wechat' ? '微信' : '支付宝';
+                    
+                    // 生成二维码
+                    qrcodeContainer.innerHTML = '';
+                    
+                    if (data.payment && data.payment.success && data.payment.codeUrl) {
+                        try {
                             // 使用qrcode.js库生成二维码
                             await QRCode.toCanvas(qrcodeContainer, data.payment.codeUrl, {
                                 width: 200,
@@ -429,28 +481,64 @@
                             statusCheckInterval = setInterval(() => {
                                 checkOrderStatus(currentOrder.orderNumber);
                             }, 5000); // 每5秒检查一次支付状态
-                            
-                            // 切换到支付页面
-                            showStep('orderStep');
-                        } else {
+                        } catch (qrError) {
+                            console.error('生成二维码错误:', qrError);
                             qrcodeContainer.innerHTML = `
                                 <div class="alert alert-danger">
-                                    获取支付二维码失败: ${data.message || '未知错误'}
+                                    生成支付二维码失败: ${qrError.message || '未知错误'}
                                 </div>
                             `;
-                            showStep('orderStep');
                         }
                     } else {
-                        // 显示错误信息
-                        alert('获取订单信息失败: ' + (data.message || '未知错误'));
-                        // 显示套餐选择页面
-                        await loadPackages();
+                        qrcodeContainer.innerHTML = `
+                            <div class="alert alert-danger">
+                                获取支付二维码失败: ${data.payment?.message || '未知错误'}
+                            </div>
+                        `;
                     }
                 } catch (error) {
                     console.error('获取订单信息错误:', error);
-                    alert('获取订单信息失败，请重新选择套餐');
-                    // 显示套餐选择页面
-                    await loadPackages();
+                    
+                    const qrcodeContainer = document.getElementById('qrcodeContainer');
+                    qrcodeContainer.innerHTML = `
+                        <div class="alert alert-danger">
+                            获取订单信息失败: ${error.message || '服务器错误'}
+                        </div>
+                    `;
+                    
+                    document.getElementById('expireMessage').textContent = '获取订单信息失败，请返回重新选择套餐';
+                    document.getElementById('checkStatusBtn').disabled = true;
+                    
+                    // 允许用户返回套餐选择页面
+                    document.getElementById('cancelOrderBtn').disabled = false;
+                    document.getElementById('cancelOrderBtn').innerHTML = '<i class="fas fa-arrow-left"></i> 返回选择';
+                    document.getElementById('cancelOrderBtn').onclick = function() {
+                        window.location.href = '/credits.html';
+                    };
+                }
+            }
+            
+            // 获取订单状态文本
+            function getStatusText(status) {
+                switch(status) {
+                    case 'pending': return '等待支付';
+                    case 'paid': return '已支付';
+                    case 'failed': return '支付失败';
+                    case 'cancelled': return '已取消';
+                    case 'expired': return '已过期';
+                    default: return '未知状态';
+                }
+            }
+            
+            // 获取订单状态样式类
+            function getStatusClass(status) {
+                switch(status) {
+                    case 'pending': return 'text-warning';
+                    case 'paid': return 'text-success';
+                    case 'failed': return 'text-danger';
+                    case 'cancelled': return 'text-secondary';
+                    case 'expired': return 'text-danger';
+                    default: return 'text-secondary';
                 }
             }
             
