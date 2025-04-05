@@ -16,6 +16,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            flex-direction: column;
         }
         
         .back-to-home {
@@ -36,6 +37,17 @@
         
         .back-to-home:hover {
             transform: translateX(-3px);
+        }
+        
+        .beian-info {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+            padding: 10px 0;
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
         }
     </style>
 </head>
@@ -82,6 +94,11 @@
                 </div>
             </form>
         </div>
+    </div>
+    
+    <div class="beian-info">
+        <p>© 2025 柯达鸭 AI 图像生成器 | 使用 OpenAI GPT-4o</p>
+        <a href="https://beian.miit.gov.cn/" target="_blank">京ICP备2025107799号</a>
     </div>
     
     <script src="auth.js"></script>
