@@ -198,10 +198,6 @@
 
           if (result.success) {
             startCountdown();
-            // 开发环境下，如果返回了验证码，自动填充
-            if (result.code) {
-              verificationCodeInput.value = result.code;
-            }
           } else {
             phoneError.textContent = result.message || '发送验证码失败';
             phoneError.style.display = 'block';
@@ -267,28 +263,8 @@
             // 绑定成功，跳转到首页
             window.location.href = '/index.html';
           } else if (result.message && result.message.includes('已被绑定')) {
-            // 手机号已被绑定，显示提示信息后重定向到登录页面
-            phoneError.textContent = '该手机号已被其他账号绑定';
-            phoneError.style.display = 'block';
-            
-            // 禁用按钮防止重复点击
-            bindBtn.disabled = true;
-            
-            // 显示指导信息
-            const guidanceDiv = document.createElement('div');
-            guidanceDiv.className = 'alert alert-info mt-3';
-            guidanceDiv.innerHTML = `
-              <h5><i class="fas fa-info-circle"></i> 下一步操作</h5>
-              <p>1. 您可以使用该手机号直接登录已绑定账号</p>
-              <p>2. 或者使用其他手机号进行绑定</p>
-              <p class="mb-0">系统将在3秒后自动跳转到登录页面...</p>
-            `;
-            bindBtn.parentNode.insertBefore(guidanceDiv, bindBtn.nextSibling);
-            
-            // 3秒后重定向到登录页面
-            setTimeout(() => {
-              window.location.href = '/login.html';
-            }, 3000);
+            // 手机号已被绑定，直接重定向到登录页面
+            window.location.href = '/login.html';
           } else {
             codeError.textContent = result.message || '验证失败';
             codeError.style.display = 'block';
