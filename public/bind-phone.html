@@ -198,6 +198,10 @@
 
           if (result.success) {
             startCountdown();
+            // 开发环境下，如果返回了验证码，自动填充
+            if (result.code) {
+              verificationCodeInput.value = result.code;
+            }
           } else {
             phoneError.textContent = result.message || '发送验证码失败';
             phoneError.style.display = 'block';
