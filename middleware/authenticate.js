@@ -17,11 +17,11 @@ const authenticate = async (req, res, next) => {
         return res.status(401).json({ 
           success: false, 
           message: '需要登录后才能访问此功能',
-          redirectTo: '/login.html'
+          redirectTo: '/login.html?redirect=index'
         });
       } else {
         // 如果是普通页面请求，重定向到登录页
-        return res.redirect('/login.html');
+        return res.redirect('/login.html?redirect=index');
       }
     }
     
@@ -40,10 +40,10 @@ const authenticate = async (req, res, next) => {
         return res.status(401).json({ 
           success: false, 
           message: '用户不存在或已被删除',
-          redirectTo: '/login.html'
+          redirectTo: '/login.html?redirect=index'
         });
       } else {
-        return res.redirect('/login.html');
+        return res.redirect('/login.html?redirect=index');
       }
     }
     
@@ -61,10 +61,10 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ 
         success: false, 
         message: '认证失败: ' + (error.message || '未知错误'),
-        redirectTo: '/login.html'
+        redirectTo: '/login.html?redirect=index'
       });
     } else {
-      return res.redirect('/login.html');
+      return res.redirect('/login.html?redirect=index');
     }
   }
 };

@@ -52,11 +52,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   const redirectParam = urlParams.get('redirect');
   
-  // 如果需要生成图像但用户未登录，重定向到登录页面
-  if (!isLoggedIn && redirectParam === 'generate') {
-    console.log('需要登录才能生成图像，重定向到登录页面');
-    window.location.href = '/login.html?redirect=index';
-    return;
+  // 如果是从登录页重定向回来的，滚动到上传区域
+  if (redirectParam === 'index' && isLoggedIn) {
+    setTimeout(() => {
+      const uploadContainer = document.querySelector('.upload-container');
+      if (uploadContainer) {
+        uploadContainer.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 500);
   }
   
   // 初始化时隐藏生成图像容器
@@ -404,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Check if form is valid
   function checkFormValidity() {
-    // 根据当前模式验证表单
+    // 根据当前模式验证表单，不检查登录状态
     if (currentMode === 'image-to-image' && !selectedFile) {
       alert('请选择一个图片文件！');
       return false;
@@ -568,10 +571,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       if (!uploadResponse.ok) {
-        // 检查是否是401未授权错误
+        // 检查是否是401未授权错误（未登录）
         if (uploadResponse.status === 401) {
           console.log('用户未登录，重定向到登录页面');
-          window.location.href = '/login.html';
+          window.location.href = '/login.html?redirect=index';
           return;
         }
         
@@ -588,9 +591,10 @@ document.addEventListener('DOMContentLoaded', () => {
           
           // 检查是否是登录相关错误
           if (errorText.includes('未登录') || errorText.includes('需要登录') || 
-              errorText.includes('请登录') || errorText.includes('login required')) {
+              errorText.includes('请登录') || errorText.includes('login required') ||
+              errorText.includes('Unauthorized') || errorText.includes('401')) {
             console.log('检测到需要登录，重定向到登录页面');
-            window.location.href = '/login.html';
+            window.location.href = '/login.html?redirect=index';
             return;
           }
           
@@ -674,7 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
                        data.content.message.includes('未授权') ||
                        data.content.message.includes('Unauthorized'))) {
                     console.log('用户未登录或会话已过期，重定向到登录页面');
-                    window.location.href = '/login.html';
+                    window.location.href = '/login.html?redirect=index';
                     return;
                   }
                   
@@ -818,16 +822,16 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleSubmit(e) {
     e.preventDefault();
     
-    // 检查用户是否登录
-    if (!localStorage.getItem('token')) {
-      console.log('用户未登录，重定向到登录页面');
-      window.location.href = '/login.html';
-      return;
-    }
-    
     // 检查表单是否有效
     if (!checkFormValidity()) {
       console.log('表单验证失败');
+      return;
+    }
+    
+    // 检查用户是否登录，如果未登录则引导到登录页面
+    if (!localStorage.getItem('token')) {
+      console.log('用户未登录，重定向到登录页面');
+      window.location.href = '/login.html?redirect=index';
       return;
     }
 

@@ -239,13 +239,21 @@ document.addEventListener('DOMContentLoaded', function() {
     uploadForm.onsubmit = async function(e) {
       e.preventDefault();
       
-      // 如果用户未登录，显示登录提示
+      // 如果用户未登录，显示登录提示并引导去登录
       if (!isAuthenticated) {
         const authBanner = document.getElementById('auth-banner');
         if (authBanner) {
           authBanner.style.display = '';
           // 滚动到提示区域
           authBanner.scrollIntoView({ behavior: 'smooth' });
+          
+          // 添加轻微延迟后跳转登录页面
+          setTimeout(() => {
+            window.location.href = '/login.html?redirect=index';
+          }, 1000);
+        } else {
+          // 如果提示区域不存在，直接跳转
+          window.location.href = '/login.html?redirect=index';
         }
         return;
       }
