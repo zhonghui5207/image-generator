@@ -25,10 +25,19 @@ setOrderProvider(async (orderNumber) => {
 // 生成订单号
 function generateOrderNumber() {
   // 使用随机的UUID并移除破折号，确保唯一性
-  const uuid = uuidv4().replace(/-/g, '').substring(0, 16);
-  // 添加前缀和时间戳
-  const timestamp = Date.now().toString().substring(0, 10);
-  return `ORD${timestamp}${uuid}`;
+  const uuid = uuidv4().replace(/-/g, '').substring(0, 8);
+  
+  // 添加前缀、完整时间戳（包含毫秒）和随机数
+  const now = new Date();
+  const timestamp = Math.floor(now.getTime() / 1000); // 秒级时间戳
+  const milliseconds = now.getMilliseconds().toString().padStart(3, '0'); // 毫秒，格式化为3位
+  const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0'); // 3位随机数
+  
+  // 将所有元素组合成订单号
+  const orderNumber = `ORD${timestamp}${milliseconds}${randomNum}${uuid}`;
+  
+  console.log(`生成新订单号: ${orderNumber}`);
+  return orderNumber;
 }
 
 // 获取积分套餐
