@@ -13,9 +13,11 @@ const router = express.Router();
 
 // 生成订单号
 function generateOrderNumber() {
-  const timestamp = new Date().getTime().toString();
-  const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
-  return `ORD${timestamp}${random}`;
+  // 使用随机的UUID并移除破折号，确保唯一性
+  const uuid = uuidv4().replace(/-/g, '').substring(0, 16);
+  // 添加前缀和时间戳
+  const timestamp = Date.now().toString().substring(0, 10);
+  return `ORD${timestamp}${uuid}`;
 }
 
 // 获取积分套餐
@@ -59,50 +61,8 @@ router.post('/create-order', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: '无效的套餐ID' });
     }
     
-    // 生成唯一订单号 - 确保不会重复
-    let orderNumber;
-    let orderExists = true;
-    let retryCount = 0;
-    const MAX_RETRIES = 3;
-    
-    // 循环尝试生成唯一订单号，并检查是否已存在
-    while (orderExists && retryCount < MAX_RETRIES) {
-      // 生成新的订单号
-      orderNumber = generateOrderNumber();
-      
-      // 检查数据库中是否已存在此订单号
-      const existingDbOrder = await Order.findOne({ orderNumber });
-      if (existingDbOrder) {
-        retryCount++;
-        continue; // 数据库中存在，继续尝试
-      }
-      
-      // 如果是微信支付，检查支付平台是否存在此订单
-      if (paymentMethod === 'wechat') {
-        try {
-          const existingOrder = await queryOrderStatus(orderNumber);
-          // 如果查询成功且订单存在，继续尝试新的订单号
-          if (existingOrder.success && existingOrder.exists) {
-            retryCount++;
-            continue;
-          }
-        } catch (error) {
-          // 查询出错，可能是订单不存在，可以继续使用
-          console.log('查询订单出错，假定订单不存在:', error.message);
-        }
-      }
-      
-      // 走到这里表示订单号在数据库和支付平台都不存在
-      orderExists = false;
-    }
-    
-    // 如果重试多次后仍不能生成唯一订单号，返回错误
-    if (orderExists) {
-      return res.status(500).json({ 
-        success: false, 
-        message: '无法生成唯一订单号，请稍后再试' 
-      });
-    }
+    // 生成订单号 - 使用UUID确保全局唯一
+    const orderNumber = generateOrderNumber();
     
     // 设置订单过期时间（30分钟后）
     const expiredAt = new Date(Date.now() + 30 * 60 * 1000);
@@ -123,7 +83,7 @@ router.post('/create-order', authenticate, async (req, res) => {
       }
     });
     
-    // 先保存订单
+    // 先保存订单到数据库
     await order.save();
     
     // 根据不同支付方式调用相应的支付接口
@@ -143,62 +103,33 @@ router.post('/create-order', authenticate, async (req, res) => {
         paymentResult = { success: false, message: '支付宝支付功能尚未实现' };
       }
       
-      // 如果支付接口调用成功，保存支付二维码URL
+      // 如果支付接口调用成功，保存二维码URL
       if (paymentResult.success && paymentResult.codeUrl) {
         order.metadata.codeUrl = paymentResult.codeUrl;
         await order.save();
       }
     } catch (error) {
-      // 捕获支付接口调用异常
       console.error('调用支付接口错误:', error);
       
-      // 处理订单号重复问题
-      if (error.message && (error.message.includes('201') || error.message.includes('订单号重复'))) {
-        try {
-          // 查询订单状态
-          const statusResult = await queryOrderStatus(orderNumber);
-          
-          if (statusResult.success && statusResult.exists) {
-            // 如果订单存在但未支付，使用已有订单信息
-            if (!statusResult.isPaid && statusResult.codeUrl) {
-              // 如果获取到了二维码URL，保存到订单中
-              order.metadata.codeUrl = statusResult.codeUrl;
-              await order.save();
-              
-              paymentResult = {
-                success: true,
-                codeUrl: statusResult.codeUrl,
-                message: '使用已存在的支付订单'
-              };
-            } else {
-              // 无法获取原始二维码，返回错误
-              paymentResult = { 
-                success: false, 
-                message: '订单号已存在，但无法获取支付二维码，请刷新页面重试',
-                orderStatus: statusResult
-              };
-            }
-          } else {
-            // 订单不存在，可能是其他原因导致的错误
-            paymentResult = {
-              success: false,
-              message: '创建支付订单失败: ' + error.message
-            };
-          }
-        } catch (statusError) {
-          console.error('查询订单状态错误:', statusError);
-          paymentResult = { 
-            success: false, 
-            message: '创建支付失败，请刷新页面重试: ' + error.message 
-          };
-        }
-      } else {
-        // 其他类型的错误
-        paymentResult = {
+      // 如果是订单号重复，这表明有严重问题，因为UUID几乎不可能重复
+      if (error.message && error.message.includes('201')) {
+        // 标记订单为失败
+        order.status = 'failed';
+        order.metadata.error = '支付创建失败：订单号重复 (UUID冲突)';
+        await order.save();
+        
+        return res.status(500).json({
           success: false,
-          message: error.message || '创建支付订单失败'
-        };
+          message: '创建支付订单失败 - 订单号重复',
+          error: error.message
+        });
       }
+      
+      // 其他错误
+      paymentResult = {
+        success: false,
+        message: error.message || '创建支付订单失败'
+      };
     }
     
     if (!paymentResult || !paymentResult.success) {

@@ -635,6 +635,10 @@
                         })
                     });
                     
+                    if (!response.ok) {
+                        throw new Error(`HTTP错误 ${response.status}: ${response.statusText}`);
+                    }
+                    
                     const data = await response.json();
                     
                     if (data.success) {
@@ -661,34 +665,44 @@
                         qrcodeContainer.innerHTML = '';
                         
                         if (data.payment.success && data.payment.codeUrl) {
-                            // 使用qrcode.js库生成二维码
-                            await QRCode.toCanvas(qrcodeContainer, data.payment.codeUrl, {
-                                width: 200,
-                                margin: 2,
-                                color: {
-                                    dark: '#000000',
-                                    light: '#ffffff'
-                                }
-                            });
+                            try {
+                                // 使用qrcode.js库生成二维码
+                                await QRCode.toCanvas(qrcodeContainer, data.payment.codeUrl, {
+                                    width: 200,
+                                    margin: 2,
+                                    color: {
+                                        dark: '#000000',
+                                        light: '#ffffff'
+                                    }
+                                });
+                                
+                                // 开始倒计时
+                                startOrderTimer(new Date(currentOrder.expiredAt));
+                                
+                                // 设置定时查询支付状态
+                                statusCheckInterval = setInterval(() => {
+                                    checkOrderStatus(currentOrder.orderNumber);
+                                }, 5000); // 每5秒检查一次支付状态
+                                
+                                // 切换到支付页面
+                                showStep('orderStep');
+                            } catch (qrError) {
+                                console.error('生成二维码错误:', qrError);
+                                qrcodeContainer.innerHTML = `
+                                    <div class="alert alert-danger">
+                                        生成支付二维码失败: ${qrError.message || '未知错误'}
+                                    </div>
+                                `;
+                                showRetry();
+                            }
                         } else {
                             qrcodeContainer.innerHTML = `
                                 <div class="alert alert-danger">
                                     生成支付二维码失败: ${data.payment.message || '未知错误'}
                                 </div>
                             `;
+                            showRetry();
                         }
-                        
-                        // 开始倒计时
-                        startOrderTimer(new Date(currentOrder.expiredAt));
-                        
-                        // 设置定时查询支付状态
-                        statusCheckInterval = setInterval(() => {
-                            checkOrderStatus(currentOrder.orderNumber);
-                        }, 5000); // 每5秒检查一次支付状态
-                        
-                        // 切换到支付页面
-                        showStep('orderStep');
-                        
                     } else {
                         // 显示错误信息
                         alert('创建订单失败: ' + (data.message || '未知错误'));
@@ -707,6 +721,30 @@
                     document.getElementById('createOrderBtn').disabled = false;
                     document.getElementById('createOrderBtn').innerHTML = '确认购买';
                 }
+            }
+            
+            // 显示重试和返回选项
+            function showRetry() {
+                // 切换到支付页面
+                showStep('orderStep');
+                
+                // 禁用检查按钮
+                document.getElementById('checkStatusBtn').disabled = true;
+                
+                // 修改取消按钮为返回
+                document.getElementById('cancelOrderBtn').innerHTML = '<i class="fas fa-arrow-left"></i> 返回选择';
+                document.getElementById('cancelOrderBtn').onclick = function() {
+                    // 清除任何定时器
+                    clearInterval(statusCheckInterval);
+                    clearTimeout(orderTimer);
+                    
+                    // 回到套餐选择页面
+                    showStep('packageStep');
+                    
+                    // 重置按钮状态
+                    document.getElementById('createOrderBtn').disabled = false;
+                    document.getElementById('createOrderBtn').innerHTML = '确认购买';
+                };
             }
             
             // 显示指定步骤

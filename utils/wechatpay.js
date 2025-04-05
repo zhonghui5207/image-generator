@@ -1,25 +1,15 @@
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import axios from 'axios';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 // 微信支付配置
 const config = {
   appId: process.env.WECHAT_APP_ID, // 微信开放平台 appid
   mchId: process.env.WECHAT_MCH_ID, // 微信支付商户号
-  mchKey: process.env.WECHAT_API_KEY, // 商户API密钥，使用WECHAT_API_KEY
-  notifyUrl: process.env.WECHAT_NOTIFY_URL, // 支付结果通知回调地址
-  // 测试模式判断
-  isTestMode: process.env.PAYMENT_TEST_MODE === 'true',
-  // 强制使用正式环境API地址（微信已经取消了沙箱环境）
-  isSandbox: false
+  mchKey: process.env.WECHAT_API_KEY, // 商户API密钥
+  notifyUrl: process.env.WECHAT_NOTIFY_URL // 支付结果通知回调地址
 };
 
 /**
@@ -119,46 +109,11 @@ function objectToXML(obj) {
  */
 export async function createWechatPayment(orderData) {
   try {
-    console.log('============= 开始创建微信支付订单 =============');
-    console.log('配置信息检查:');
-    console.log('- 测试模式:', config.isTestMode);
-    console.log('- 沙箱模式:', config.isSandbox);
-    console.log('- AppID:', config.appId ? '已配置' : '未配置');
-    console.log('- 商户号:', config.mchId ? '已配置' : '未配置');
-    console.log('- API密钥:', config.mchKey ? '已配置' : '未配置');
-    console.log('- 回调地址:', config.notifyUrl);
-    console.log('订单数据:', JSON.stringify(orderData));
-    
-    // 测试模式下，直接返回模拟支付成功结果
-    if (config.isTestMode) {
-      console.log('测试模式：模拟创建微信支付订单');
-      return {
-        success: true,
-        codeUrl: 'weixin://wxpay/bizpayurl?pr=test_code_url',
-        orderNumber: orderData.orderNumber,
-        amount: orderData.amount,
-        timestamp: Math.floor(Date.now() / 1000),
-        nonceStr: generateNonceStr(),
-        isTestMode: true
-      };
-    }
+    console.log('创建微信支付订单:', orderData.orderNumber);
     
     // 参数校验
-    if (!config.appId) {
-      console.error('缺少微信支付AppID配置');
-      return { success: false, message: '缺少微信支付AppID配置' };
-    }
-    if (!config.mchId) {
-      console.error('缺少微信支付商户号配置');
-      return { success: false, message: '缺少微信支付商户号配置' };
-    }
-    if (!config.mchKey) {
-      console.error('缺少微信支付API密钥配置');
-      return { success: false, message: '缺少微信支付API密钥配置' };
-    }
-    if (!config.notifyUrl) {
-      console.error('缺少微信支付回调地址配置');
-      return { success: false, message: '缺少微信支付回调地址配置' };
+    if (!config.appId || !config.mchId || !config.mchKey || !config.notifyUrl) {
+      return { success: false, message: '缺少微信支付配置' };
     }
     
     // 构建统一下单参数
@@ -172,107 +127,60 @@ export async function createWechatPayment(orderData) {
       spbill_create_ip: orderData.ip || '127.0.0.1',
       notify_url: config.notifyUrl,
       trade_type: 'NATIVE' // 电脑网页扫码支付
-      // 注释掉time_start和time_expire，让微信支付API使用默认值
-      // 微信支付的默认过期时间为2小时，符合最低要求
     };
-    
-    console.log('微信支付请求参数:', JSON.stringify(params));
     
     // 添加签名
     params.sign = generateSign(params);
-    console.log('生成的签名:', params.sign);
     
     // 转换为XML
     const xmlData = objectToXML(params);
-    console.log('请求XML数据:', xmlData);
     
-    // 确定统一下单API地址
+    // 统一下单API地址
     const unifiedOrderUrl = 'https://api.mch.weixin.qq.com/pay/unifiedorder';
-    console.log('请求API地址:', unifiedOrderUrl);
-    
-    console.log('正在发起HTTP请求...');
     
     // 发送请求到微信支付API
-    try {
-      console.log('准备发送XML请求数据:', xmlData);
+    const response = await axios.post(unifiedOrderUrl, xmlData, {
+      headers: { 'Content-Type': 'text/xml' },
+      timeout: 10000 // 10秒超时
+    });
+    
+    // 解析响应XML
+    const result = parseXML(response.data);
+    console.log('微信支付返回结果:', JSON.stringify(result));
+    
+    // 检查返回结果
+    if (result.return_code === 'SUCCESS' && result.result_code === 'SUCCESS') {
+      return {
+        success: true,
+        codeUrl: result.code_url,
+        orderNumber: orderData.orderNumber,
+        amount: orderData.amount,
+        timestamp: Math.floor(Date.now() / 1000),
+        nonceStr: params.nonce_str
+      };
+    } else {
+      // 错误信息
+      let errorMsg = '未知错误';
       
-      const response = await axios.post(unifiedOrderUrl, xmlData, {
-        headers: { 'Content-Type': 'text/xml' },
-        timeout: 10000 // 10秒超时
-      });
-      
-      console.log('收到HTTP响应状态码:', response.status);
-      console.log('响应原始数据:', response.data);
-      
-      // 直接输出原始XML以便检查
-      console.log('原始XML响应:', response.data);
-      
-      // 解析响应XML
-      const result = parseXML(response.data);
-      console.log('解析后的响应结果:', JSON.stringify(result, null, 2));
-      
-      // 检查返回结果
-      if (result.return_code === 'SUCCESS' && result.result_code === 'SUCCESS') {
-        console.log('微信支付订单创建成功, 二维码URL:', result.code_url);
-        // 成功返回二维码URL
-        return {
-          success: true,
-          codeUrl: result.code_url,
-          orderNumber: orderData.orderNumber,
-          amount: orderData.amount,
-          timestamp: Math.floor(Date.now() / 1000),
-          nonceStr: params.nonce_str
-        };
-      } else {
-        // 仔细检查错误信息
-        let errorMsg = '未知错误';
-        
-        if (result.return_code === 'FAIL') {
-          console.error('微信支付通信失败:', result.return_msg);
-          errorMsg = `通信失败: ${result.return_msg}`;
-        } else if (result.result_code === 'FAIL') {
-          console.error('微信支付业务失败:', 
-            result.err_code, result.err_code_des);
-          errorMsg = `业务失败: ${result.err_code_des || result.err_code}`;
-        }
-        
-        console.error('完整响应结果:', JSON.stringify(result, null, 2));
-        
-        // 返回错误信息
-        return {
-          success: false,
-          message: errorMsg,
-          error: result
-        };
-      }
-    } catch (httpError) {
-      console.error('HTTP请求失败:', httpError.message);
-      console.error('错误详情:', httpError);
-      if (httpError.response) {
-        console.error('响应状态码:', httpError.response.status);
-        console.error('响应头:', JSON.stringify(httpError.response.headers));
-        console.error('响应数据:', httpError.response.data);
-      } else if (httpError.request) {
-        console.error('请求已发送但没有收到响应');
-        console.error('请求对象:', httpError.request);
+      if (result.return_code === 'FAIL') {
+        errorMsg = `通信失败: ${result.return_msg}`;
+      } else if (result.result_code === 'FAIL') {
+        errorMsg = `业务失败: ${result.err_code_des || result.err_code}`;
       }
       
       return {
         success: false,
-        message: `HTTP请求失败: ${httpError.message}`,
-        error: httpError.toString()
+        message: errorMsg,
+        error: result
       };
     }
   } catch (error) {
-    console.error('创建微信支付订单出错:', error);
-    console.error('错误堆栈:', error.stack);
+    console.error('微信支付请求失败:', error);
     return {
       success: false,
       message: error.message || '创建支付订单失败',
       error: error.toString()
     };
-  } finally {
-    console.log('============= 结束创建微信支付订单 =============');
   }
 }
 
@@ -302,34 +210,7 @@ export function verifyNotifySign(notifyData) {
  */
 export async function queryOrderStatus(orderNumber) {
   try {
-    console.log('============= 开始查询订单状态 =============');
-    console.log('订单号:', orderNumber);
-    console.log('配置信息检查:');
-    console.log('- 测试模式:', config.isTestMode);
-    console.log('- 沙箱模式:', config.isSandbox);
-    
-    // 测试模式下，直接返回模拟支付成功结果
-    if (config.isTestMode) {
-      console.log('测试模式：模拟查询微信支付订单');
-      
-      // 50%的概率返回支付成功，模拟实际支付情况
-      const isPaid = Math.random() > 0.5;
-      console.log('模拟支付状态:', isPaid ? '已支付' : '未支付');
-      
-      return {
-        success: true,
-        status: isPaid ? 'SUCCESS' : 'NOTPAY',
-        isPaid: isPaid,
-        exists: true, // 表示订单在支付平台存在
-        transactionId: isPaid ? `test_${Date.now()}` : '',
-        orderNumber: orderNumber,
-        amount: 0,
-        timeEnd: isPaid ? new Date().toISOString().replace(/[-T:.Z]/g, '').substring(0, 14) : '',
-        isTestMode: true,
-        // 测试模式下提供虚拟二维码
-        codeUrl: 'weixin://wxpay/bizpayurl?pr=test_code_url'
-      };
-    }
+    console.log('查询订单状态:', orderNumber);
     
     // 构建查询参数
     const params = {
@@ -339,114 +220,66 @@ export async function queryOrderStatus(orderNumber) {
       nonce_str: generateNonceStr()
     };
     
-    console.log('查询参数:', JSON.stringify(params));
-    
     // 添加签名
     params.sign = generateSign(params);
-    console.log('生成的签名:', params.sign);
     
     // 转换为XML
     const xmlData = objectToXML(params);
-    console.log('请求XML数据:', xmlData);
     
-    // 确定订单查询API地址
+    // 订单查询API地址
     const orderQueryUrl = 'https://api.mch.weixin.qq.com/pay/orderquery';
-    console.log('请求API地址:', orderQueryUrl);
-    
-    console.log('正在发起HTTP请求...');
     
     // 发送请求到微信支付API
-    try {
-      const response = await axios.post(orderQueryUrl, xmlData, {
-        headers: { 'Content-Type': 'text/xml' },
-        timeout: 10000 // 10秒超时
-      });
-      
-      console.log('收到HTTP响应状态码:', response.status);
-      console.log('响应数据:', response.data);
-      
-      // 解析响应XML
-      const result = parseXML(response.data);
-      console.log('解析后的响应结果:', JSON.stringify(result));
-      
-      // 检查返回结果
-      if (result.return_code === 'SUCCESS') {
-        if (result.result_code === 'SUCCESS') {
-          console.log('查询成功, 订单状态:', result.trade_state);
-          
-          // 对于已存在的订单，尝试获取二维码URL
-          let codeUrl = null;
-          
-          // 如果订单存在但未支付，我们可以通过其他接口获取二维码URL
-          if (result.trade_state === 'NOTPAY') {
-            try {
-              // 由于微信支付API限制，无法直接获取已有订单的二维码，
-              // 这里我们需要使用额外的方法处理，例如从订单附加数据中获取
-              // 或者可能需要考虑保存到数据库中
-              console.log('订单未支付，尝试获取支付二维码');
-            } catch (codeUrlError) {
-              console.error('获取已有订单二维码失败:', codeUrlError);
-            }
-          }
-          
-          // 返回订单状态
-          return {
-            success: true,
-            status: result.trade_state,
-            isPaid: result.trade_state === 'SUCCESS',
-            exists: true, // 表示订单在支付平台存在
-            transactionId: result.transaction_id || '',
-            orderNumber: result.out_trade_no,
-            amount: parseInt(result.total_fee || '0') / 100, // 将分转为元
-            timeEnd: result.time_end || '',
-            codeUrl: codeUrl // 可能为空
-          };
-        } else {
-          // 对于 ORDERNOTEXIST 错误，我们标记订单不存在
-          const notExist = result.err_code === 'ORDERNOTEXIST';
-          
-          console.error('查询返回业务失败:', result.err_code_des || '订单查询失败');
-          return {
-            success: false,
-            message: result.err_code_des || '订单查询失败',
-            error: result,
-            exists: !notExist // 如果错误是订单不存在，则标记为不存在
-          };
-        }
+    const response = await axios.post(orderQueryUrl, xmlData, {
+      headers: { 'Content-Type': 'text/xml' },
+      timeout: 10000 // 10秒超时
+    });
+    
+    // 解析响应XML
+    const result = parseXML(response.data);
+    console.log('查询订单结果:', JSON.stringify(result));
+    
+    // 检查返回结果
+    if (result.return_code === 'SUCCESS') {
+      if (result.result_code === 'SUCCESS') {
+        // 返回订单状态
+        return {
+          success: true,
+          status: result.trade_state,
+          isPaid: result.trade_state === 'SUCCESS',
+          exists: true,
+          transactionId: result.transaction_id || '',
+          orderNumber: result.out_trade_no,
+          amount: parseInt(result.total_fee || '0') / 100,
+          timeEnd: result.time_end || ''
+        };
       } else {
-        console.error('查询通信失败:', result.return_msg || '通信失败');
+        // 订单不存在判断
+        const notExist = result.err_code === 'ORDERNOTEXIST';
+        
         return {
           success: false,
-          message: result.return_msg || '通信失败',
+          message: result.err_code_des || '订单查询失败',
           error: result,
-          exists: false // 通信失败，无法确定是否存在
+          exists: !notExist // 如果错误是订单不存在，则标记为不存在
         };
       }
-    } catch (httpError) {
-      console.error('HTTP请求失败:', httpError.message);
-      if (httpError.response) {
-        console.error('响应状态码:', httpError.response.status);
-        console.error('响应数据:', httpError.response.data);
-      }
-      
+    } else {
       return {
         success: false,
-        message: `HTTP请求失败: ${httpError.message}`,
-        error: httpError.toString(),
-        exists: false // 请求失败，无法确定是否存在
+        message: result.return_msg || '通信失败',
+        error: result,
+        exists: false
       };
     }
   } catch (error) {
-    console.error('查询微信支付订单出错:', error);
-    console.error('错误堆栈:', error.stack);
+    console.error('查询订单状态失败:', error);
     return {
       success: false,
       message: error.message || '查询订单失败',
       error: error.toString(),
-      exists: false // 查询出错，无法确定是否存在
+      exists: false
     };
-  } finally {
-    console.log('============= 结束查询订单状态 =============');
   }
 }
 
@@ -457,21 +290,7 @@ export async function queryOrderStatus(orderNumber) {
  */
 export async function closeOrder(orderNumber) {
   try {
-    console.log('============= 开始关闭订单 =============');
-    console.log('订单号:', orderNumber);
-    console.log('配置信息检查:');
-    console.log('- 测试模式:', config.isTestMode);
-    console.log('- 沙箱模式:', config.isSandbox);
-    
-    // 测试模式下，直接返回模拟关闭成功结果
-    if (config.isTestMode) {
-      console.log('测试模式：模拟关闭微信支付订单');
-      return {
-        success: true,
-        orderNumber: orderNumber,
-        isTestMode: true
-      };
-    }
+    console.log('关闭订单:', orderNumber);
     
     // 构建关闭订单参数
     const params = {
@@ -481,74 +300,44 @@ export async function closeOrder(orderNumber) {
       nonce_str: generateNonceStr()
     };
     
-    console.log('关闭订单参数:', JSON.stringify(params));
-    
     // 添加签名
     params.sign = generateSign(params);
-    console.log('生成的签名:', params.sign);
     
     // 转换为XML
     const xmlData = objectToXML(params);
-    console.log('请求XML数据:', xmlData);
     
-    // 确定关闭订单API地址
+    // 关闭订单API地址
     const closeOrderUrl = 'https://api.mch.weixin.qq.com/pay/closeorder';
-    console.log('请求API地址:', closeOrderUrl);
-    
-    console.log('正在发起HTTP请求...');
     
     // 发送请求到微信支付API
-    try {
-      const response = await axios.post(closeOrderUrl, xmlData, {
-        headers: { 'Content-Type': 'text/xml' },
-        timeout: 10000 // 10秒超时
-      });
-      
-      console.log('收到HTTP响应状态码:', response.status);
-      console.log('响应数据:', response.data);
-      
-      // 解析响应XML
-      const result = parseXML(response.data);
-      console.log('解析后的响应结果:', JSON.stringify(result));
-      
-      // 检查返回结果
-      if (result.return_code === 'SUCCESS' && result.result_code === 'SUCCESS') {
-        console.log('订单关闭成功');
-        return {
-          success: true,
-          orderNumber: orderNumber
-        };
-      } else {
-        console.error('关闭订单失败:', 
-          result.return_msg || result.err_code_des || '关闭订单失败');
-        return {
-          success: false,
-          message: result.return_msg || result.err_code_des || '关闭订单失败',
-          error: result
-        };
-      }
-    } catch (httpError) {
-      console.error('HTTP请求失败:', httpError.message);
-      if (httpError.response) {
-        console.error('响应状态码:', httpError.response.status);
-        console.error('响应数据:', httpError.response.data);
-      }
-      
+    const response = await axios.post(closeOrderUrl, xmlData, {
+      headers: { 'Content-Type': 'text/xml' },
+      timeout: 10000 // 10秒超时
+    });
+    
+    // 解析响应XML
+    const result = parseXML(response.data);
+    console.log('关闭订单结果:', JSON.stringify(result));
+    
+    // 检查返回结果
+    if (result.return_code === 'SUCCESS' && result.result_code === 'SUCCESS') {
+      return {
+        success: true,
+        orderNumber: orderNumber
+      };
+    } else {
       return {
         success: false,
-        message: `HTTP请求失败: ${httpError.message}`,
-        error: httpError.toString()
+        message: result.return_msg || result.err_code_des || '关闭订单失败',
+        error: result
       };
     }
   } catch (error) {
-    console.error('关闭微信支付订单出错:', error);
-    console.error('错误堆栈:', error.stack);
+    console.error('关闭订单失败:', error);
     return {
       success: false,
       message: error.message || '关闭订单失败',
       error: error.toString()
     };
-  } finally {
-    console.log('============= 结束关闭订单 =============');
   }
 } 
