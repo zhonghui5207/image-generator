@@ -3,13 +3,24 @@ import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from '../utils/auth.js';
 import Order from '../models/Order.js';
 import User from '../models/User.js';
-import { createWechatPayment, verifyNotifySign, queryOrderStatus, closeOrder } from '../utils/wechatpay.js';
+import { createWechatPayment, verifyNotifySign, queryOrderStatus, closeOrder, setOrderProvider } from '../utils/wechatpay.js';
 import { addCredits } from './creditRoutes.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const router = express.Router();
+
+// 为微信支付模块提供订单查询能力
+setOrderProvider(async (orderNumber) => {
+  try {
+    // 从数据库中查询订单
+    return await Order.findOne({ orderNumber });
+  } catch (error) {
+    console.error('查询订单失败:', error);
+    return null;
+  }
+});
 
 // 生成订单号
 function generateOrderNumber() {

@@ -59,7 +59,7 @@ const orderSchema = new mongoose.Schema({
 
 // 添加索引以便于查询
 orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ orderNumber: 1 });
+// orderNumber已经在schema中设置了unique:true
 orderSchema.index({ status: 1 });
 
 const Order = mongoose.model('Order', orderSchema);
