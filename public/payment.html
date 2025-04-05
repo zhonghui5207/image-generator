@@ -6,7 +6,7 @@
     <title>充值积分 - 柯达鸭 AI 图像生成器</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="css/style.css">
     <style>
         .package-card {
             border: 2px solid #e9ecef;
@@ -305,10 +305,11 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async function() {
             // 验证登录状态
-            if (!isAuthenticated()) {
+            if (!await auth.checkLogin()) {
                 window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
                 return;
             }
@@ -320,8 +321,17 @@
             let orderTimer = null;
             let statusCheckInterval = null;
             
-            // 加载积分套餐
-            await loadPackages();
+            // 检查URL中是否有订单参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderNumber = urlParams.get('order');
+            
+            if (orderNumber) {
+                // 直接加载订单信息
+                await loadOrderInfo(orderNumber);
+            } else {
+                // 正常加载套餐列表
+                await loadPackages();
+            }
             
             // 处理支付方式选择
             document.querySelectorAll('.payment-method').forEach(method => {
@@ -365,6 +375,84 @@
                 // 切换回套餐选择页面
                 showStep('packageStep');
             });
+            
+            // 加载订单信息
+            async function loadOrderInfo(orderNumber) {
+                try {
+                    const response = await fetch(`/api/payment/order-info/${orderNumber}`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${getToken()}`
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // 保存当前订单信息
+                        currentOrder = {
+                            orderNumber: data.order.orderNumber,
+                            amount: data.order.amount,
+                            credits: data.order.credits,
+                            paymentMethod: data.order.paymentMethod,
+                            expiredAt: data.order.expiredAt,
+                            packageName: data.order.packageName || data.package.name
+                        };
+                        
+                        // 显示支付信息
+                        document.getElementById('orderNumber').textContent = currentOrder.orderNumber;
+                        document.getElementById('packageName').textContent = currentOrder.packageName;
+                        document.getElementById('creditAmount').textContent = currentOrder.credits;
+                        document.getElementById('payAmount').textContent = currentOrder.amount.toFixed(2);
+                        document.getElementById('payMethod').textContent = currentOrder.paymentMethod === 'wechat' ? '微信支付' : '支付宝';
+                        document.getElementById('scanApp').textContent = currentOrder.paymentMethod === 'wechat' ? '微信' : '支付宝';
+                        
+                        // 生成二维码
+                        const qrcodeContainer = document.getElementById('qrcodeContainer');
+                        qrcodeContainer.innerHTML = '';
+                        
+                        if (data.payment && data.payment.codeUrl) {
+                            // 使用qrcode.js库生成二维码
+                            await QRCode.toCanvas(qrcodeContainer, data.payment.codeUrl, {
+                                width: 200,
+                                margin: 2,
+                                color: {
+                                    dark: '#000000',
+                                    light: '#ffffff'
+                                }
+                            });
+                            
+                            // 开始倒计时
+                            startOrderTimer(new Date(currentOrder.expiredAt));
+                            
+                            // 设置定时查询支付状态
+                            statusCheckInterval = setInterval(() => {
+                                checkOrderStatus(currentOrder.orderNumber);
+                            }, 5000); // 每5秒检查一次支付状态
+                            
+                            // 切换到支付页面
+                            showStep('orderStep');
+                        } else {
+                            qrcodeContainer.innerHTML = `
+                                <div class="alert alert-danger">
+                                    获取支付二维码失败: ${data.message || '未知错误'}
+                                </div>
+                            `;
+                            showStep('orderStep');
+                        }
+                    } else {
+                        // 显示错误信息
+                        alert('获取订单信息失败: ' + (data.message || '未知错误'));
+                        // 显示套餐选择页面
+                        await loadPackages();
+                    }
+                } catch (error) {
+                    console.error('获取订单信息错误:', error);
+                    alert('获取订单信息失败，请重新选择套餐');
+                    // 显示套餐选择页面
+                    await loadPackages();
+                }
+            }
             
             // 加载积分套餐
             async function loadPackages() {

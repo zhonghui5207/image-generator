@@ -931,27 +931,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectedModel = document.querySelector('input[name="model"]:checked').value;
     
     // 确定消耗的积分数量
-    let creditsToUse = 4; // 默认标准模式消耗4积分
+    let creditsToUse = 1; // 默认消耗1积分
     if (selectedModel === 'gpt-4o-image-vip') {
-      creditsToUse = 8; // 专业模式消耗8积分
-    } else if (selectedModel === 'gpt-4o-all') {
-      creditsToUse = 5; // 高级模式消耗5积分
+      creditsToUse = 2; // VIP模型消耗2积分
     }
     
     // 检查用户积分是否足够
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     if (user && user.credits < creditsToUse) {
-      // 根据模型显示对应的积分消耗信息
-      let modelCreditsMsg = '';
-      if (selectedModel === 'gpt-4o-image-vip') {
-        modelCreditsMsg = '专业模式需要8积分';
-      } else if (selectedModel === 'gpt-4o-all') {
-        modelCreditsMsg = '高级模式需要5积分';
-      } else {
-        modelCreditsMsg = '标准模式需要4积分';
-      }
-      
-      showError(`积分不足！${modelCreditsMsg}，您当前只有 ${user.credits} 积分。`);
+      showError(`积分不足！${selectedModel === 'gpt-4o-image-vip' ? 'VIP模型需要2积分' : '生成图像需要1积分'}，您当前只有 ${user.credits} 积分。`);
       uploadForm.parentElement.hidden = false;
       loadingIndicator.style.display = 'none';
       return;
