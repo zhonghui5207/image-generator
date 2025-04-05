@@ -44,6 +44,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const imageStylePresets = getElement('image-style-presets');
   const textStylePresets = getElement('text-style-presets');
   
+  // 检查用户登录状态
+  const token = localStorage.getItem('token');
+  const isLoggedIn = !!token;
+  
+  // 获取URL参数
+  const urlParams = new URLSearchParams(window.location.search);
+  const redirectParam = urlParams.get('redirect');
+  
+  // 如果需要生成图像但用户未登录，重定向到登录页面
+  if (!isLoggedIn && redirectParam === 'generate') {
+    console.log('需要登录才能生成图像，重定向到登录页面');
+    window.location.href = '/login.html?redirect=index';
+    return;
+  }
+  
   // 初始化时隐藏生成图像容器
   if (generatedImageContainer) {
     generatedImageContainer.style.display = 'none';
@@ -389,25 +404,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Check if form is valid
   function checkFormValidity() {
-    // 根据当前模式检查表单有效性
-    let isValid = false;
-    
-    if (currentMode === 'image-to-image') {
-      // 图生图模式：需要图片和提示词
-      isValid = selectedFile && promptInput.value.trim();
-    } else {
-      // 文生图模式：只需要提示词
-      isValid = promptInput.value.trim().length >= 5; // 至少需要5个字符的提示词
+    // 根据当前模式验证表单
+    if (currentMode === 'image-to-image' && !selectedFile) {
+      alert('请选择一个图片文件！');
+      return false;
     }
     
-    generateBtn.disabled = !isValid;
-    
-    // 添加颜色反馈，使按钮状态更明显
-    if (isValid) {
-      generateBtn.classList.add('active');
-    } else {
-      generateBtn.classList.remove('active');
+    if (!promptInput.value.trim()) {
+      alert('请输入提示词！');
+      return false;
     }
+    
+    return true;
   }
 
   // Prompt input event
@@ -560,6 +568,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       if (!uploadResponse.ok) {
+        // 检查是否是401未授权错误
+        if (uploadResponse.status === 401) {
+          console.log('用户未登录，重定向到登录页面');
+          window.location.href = '/login.html';
+          return;
+        }
+        
         // 尝试解析错误响应
         try {
           const errorData = await uploadResponse.json();
@@ -570,6 +585,14 @@ document.addEventListener('DOMContentLoaded', () => {
           
           // 尝试获取响应的文本内容
           const errorText = await uploadResponse.text();
+          
+          // 检查是否是登录相关错误
+          if (errorText.includes('未登录') || errorText.includes('需要登录') || 
+              errorText.includes('请登录') || errorText.includes('login required')) {
+            console.log('检测到需要登录，重定向到登录页面');
+            window.location.href = '/login.html';
+            return;
+          }
           
           // 检查是否为HTML内容（通常表示服务器错误）
           if (errorText.includes('<!DOCTYPE') || errorText.includes('<html')) {
@@ -643,6 +666,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (data.type === 'error') {
                   // 错误信息
                   console.error('收到错误信息:', data.content);
+                  
+                  // 检查是否是未登录或授权相关错误
+                  if (data.content.message && 
+                      (data.content.message.includes('未登录') || 
+                       data.content.message.includes('需要登录') || 
+                       data.content.message.includes('未授权') ||
+                       data.content.message.includes('Unauthorized'))) {
+                    console.log('用户未登录或会话已过期，重定向到登录页面');
+                    window.location.href = '/login.html';
+                    return;
+                  }
                   
                   // 如果是积分不足错误，显示特定提示
                   if (data.content.message && data.content.message.includes('积分不足')) {
@@ -783,15 +817,17 @@ document.addEventListener('DOMContentLoaded', () => {
   
   async function handleSubmit(e) {
     e.preventDefault();
-
-    // 根据当前模式验证表单
-    if (currentMode === 'image-to-image' && !selectedFile) {
-      alert('请选择一个图片文件！');
+    
+    // 检查用户是否登录
+    if (!localStorage.getItem('token')) {
+      console.log('用户未登录，重定向到登录页面');
+      window.location.href = '/login.html';
       return;
     }
     
-    if (!promptInput.value.trim()) {
-      alert('请输入提示词！');
+    // 检查表单是否有效
+    if (!checkFormValidity()) {
+      console.log('表单验证失败');
       return;
     }
 
