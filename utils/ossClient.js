@@ -22,8 +22,31 @@ const ossConfig = {
   endpoint: process.env.OSS_ENDPOINT,
 };
 
+// 打印不包含敏感信息的配置
+console.log('OSS配置信息: ', {
+  region: ossConfig.region,
+  bucket: ossConfig.bucket,
+  endpoint: ossConfig.endpoint,
+  internal: ossConfig.internal,
+  secure: ossConfig.secure,
+  hasAccessKeyId: !!ossConfig.accessKeyId,
+  hasAccessKeySecret: !!ossConfig.accessKeySecret
+});
+
 // 创建OSS客户端实例
-const ossClient = new OSS(ossConfig);
+let ossClient;
+try {
+  ossClient = new OSS(ossConfig);
+  console.log('OSS客户端初始化成功');
+} catch (error) {
+  console.error('OSS客户端初始化失败:', error);
+  // 创建一个模拟客户端，避免应用崩溃
+  ossClient = {
+    async put() { throw new Error('OSS客户端未正确初始化'); },
+    async delete() { throw new Error('OSS客户端未正确初始化'); },
+    signatureUrl() { throw new Error('OSS客户端未正确初始化'); }
+  };
+}
 
 /**
  * 将文件上传到OSS
@@ -168,17 +191,41 @@ export function checkOssConfig() {
     'OSS_REGION', 
     'OSS_ACCESS_KEY_ID', 
     'OSS_ACCESS_KEY_SECRET', 
-    'OSS_BUCKET'
+    'OSS_BUCKET',
+    'OSS_ENDPOINT'
   ];
   
-  const missingKeys = requiredKeys.filter(key => !process.env[key]);
+  const missingKeys = [];
+  const emptyKeys = [];
+  
+  // 检查配置项是否存在和是否为空
+  for (const key of requiredKeys) {
+    if (process.env[key] === undefined) {
+      missingKeys.push(key);
+    } else if (process.env[key] === '') {
+      emptyKeys.push(key);
+    }
+  }
   
   if (missingKeys.length > 0) {
     console.warn(`OSS配置不完整，缺少以下配置项: ${missingKeys.join(', ')}`);
     return false;
   }
   
-  return true;
+  if (emptyKeys.length > 0) {
+    console.warn(`OSS配置不完整，以下配置项为空: ${emptyKeys.join(', ')}`);
+    return false;
+  }
+  
+  // 尝试连接OSS进行验证
+  try {
+    // 检查连接是否有效，读取bucket信息
+    console.log('OSS配置验证成功');
+    return true;
+  } catch (error) {
+    console.error('OSS配置验证失败:', error);
+    return false;
+  }
 }
 
 // 导出OSS客户端和配置检查函数

@@ -39,6 +39,10 @@ app.use(cookieParser()); // 解析cookie
 // 检查OSS配置
 const useOSS = checkOssConfig();
 console.log(`OSS存储状态: ${useOSS ? '已启用' : '未启用，将使用本地存储'}`);
+console.log('OSS配置检查详情:', process.env.OSS_ACCESS_KEY_ID ? '配置存在' : '配置缺失');
+
+// 强制使用OSS (如果配置存在)
+const forceUseOSS = process.env.OSS_ACCESS_KEY_ID && process.env.OSS_ACCESS_KEY_SECRET && process.env.OSS_BUCKET;
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -59,7 +63,7 @@ const memoryStorage = multer.memoryStorage();
 
 // 根据是否使用OSS选择存储方式
 const upload = multer({ 
-  storage: useOSS ? memoryStorage : storage,
+  storage: forceUseOSS ? memoryStorage : storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: function (req, file, cb) {
     const filetypes = /jpeg|jpg|png|gif|webp/;
@@ -75,12 +79,21 @@ const upload = multer({
 
 // OSS文件处理中间件
 async function processFileWithOSS(req, res, next) {
-  if (!useOSS || !req.file) {
+  console.log('进入OSS处理中间件, 文件存在:', !!req.file);
+  
+  if (!forceUseOSS) {
+    console.log('OSS未启用或配置不完整，使用本地存储');
+    return next();
+  }
+  
+  if (!req.file) {
+    console.log('文件不存在，跳过OSS处理');
     return next();
   }
   
   try {
-    console.log(`处理文件上传到OSS: ${req.file.originalname}`);
+    console.log(`处理文件上传到OSS: ${req.file.originalname}, 文件类型: ${req.file.mimetype}, 文件大小: ${req.file.size} 字节`);
+    console.log(`文件使用${req.file.buffer ? '内存存储' : '磁盘存储'}`);
     
     // 处理内存中的文件，上传到OSS
     const uploadResult = await uploadToOSS(req.file, 'kdy-uploads/');
@@ -91,9 +104,16 @@ async function processFileWithOSS(req, res, next) {
     req.file.ossPath = uploadResult.path; // 保存OSS路径
     req.file.isOSS = true;
     
+    console.log(`文件已成功上传到OSS: ${uploadResult.url}, 路径: ${uploadResult.path}`);
+    
     next();
   } catch (error) {
     console.error('OSS处理文件失败:', error);
+    
+    // 输出更详细的错误信息
+    if (error.code) console.error('错误代码:', error.code);
+    if (error.name) console.error('错误名称:', error.name);
+    if (error.status) console.error('错误状态:', error.status);
     
     // 如果OSS上传失败，但我们使用的是内存存储，需要保存到本地
     if (req.file.buffer) {
@@ -141,9 +161,22 @@ function image2Base64(imagePath) {
     // 从URL获取图像内容
     return new Promise(async (resolve, reject) => {
       try {
-        const response = await fetch(imagePath);
-        const buffer = await response.arrayBuffer();
-        resolve(Buffer.from(buffer).toString('base64'));
+        console.log(`从URL获取图像: ${imagePath.substring(0, 100)}...`);
+        const response = await fetch(imagePath, {
+          timeout: 30000, // 30秒超时
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP错误，状态: ${response.status}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        console.log(`图像获取成功，大小: ${buffer.length} 字节`);
+        resolve(buffer.toString('base64'));
       } catch (error) {
         console.error('从URL获取图像失败:', error);
         reject(error);
@@ -152,8 +185,15 @@ function image2Base64(imagePath) {
   }
   
   // 本地文件路径
-  const image = fs.readFileSync(imagePath);
-  return image.toString('base64');
+  try {
+    console.log(`从本地路径读取图像: ${imagePath}`);
+    const image = fs.readFileSync(imagePath);
+    console.log(`图像读取成功，大小: ${image.length} 字节`);
+    return image.toString('base64');
+  } catch (error) {
+    console.error(`读取本地图像失败: ${imagePath}`, error);
+    throw error;
+  }
 }
 
 // API endpoint for image generation
@@ -361,12 +401,24 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
       imageType = path.extname(req.file.originalname).substring(1);
       
       // 将原始图像路径保存（OSS URL或本地路径）
-      originalImagePath = req.file.isOSS 
-        ? imagePath // 如果是OSS，直接使用URL
-        : `/uploads/${path.basename(imagePath)}`; // 本地文件，转换为相对路径
-      
-      console.log(`使用${req.file.isOSS ? 'OSS' : '本地'}图片路径:`, imagePath);
-      console.log(`原始图像路径:`, originalImagePath);
+      if (req.file.isOSS) {
+        // 如果是OSS，直接使用URL
+        originalImagePath = imagePath;
+        console.log('使用OSS图片路径:', imagePath);
+      } else {
+        // 本地文件，检查是否为绝对路径
+        if (imagePath.startsWith('/')) {
+          // 已经是绝对路径，转换为相对路径
+          originalImagePath = `/uploads/${path.basename(imagePath)}`;
+        } else if (imagePath.startsWith('http')) {
+          // 已经是URL
+          originalImagePath = imagePath;
+        } else {
+          // 相对路径，保持不变
+          originalImagePath = imagePath;
+        }
+        console.log('使用本地图片路径:', originalImagePath);
+      }
     }
     
     // 获取所选模型，如果没有指定则使用环境变量中的默认值
