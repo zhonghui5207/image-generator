@@ -831,6 +831,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   
+  // 处理表单提交 - 确保函数在全局范围内可用
   async function handleSubmit(e) {
     e.preventDefault();
     
@@ -845,13 +846,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     
-    // 检查用户是否登录，如果未登录则引导到登录页面
-    if (!localStorage.getItem('token')) {
-      console.log('用户未登录，重定向到登录页面');
-      window.location.href = '/login.html?redirect=index';
-      return;
-    }
-
     // 显示加载状态
     uploadForm.parentElement.hidden = true;
     loadingIndicator.style.display = 'flex';
@@ -1064,6 +1058,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 1000);
     }
   }
+
+  // 将handleSubmit设置为全局函数
+  window.handleSubmit = handleSubmit;
 
   // 增强版错误处理函数
   function showError(message) {

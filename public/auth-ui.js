@@ -234,13 +234,13 @@ document.addEventListener('DOMContentLoaded', function() {
   // 修改图像生成表单提交逻辑，检查用户是否登录以及是否有足够积分
   const uploadForm = document.getElementById('upload-form');
   if (uploadForm) {
-    const originalSubmitEvent = uploadForm.onsubmit;
-    
-    uploadForm.onsubmit = async function(e) {
+    uploadForm.addEventListener('submit', function(e) {
+      // 阻止默认表单提交
       e.preventDefault();
       
       // 如果用户未登录，显示登录提示并引导去登录
       if (!isAuthenticated) {
+        console.log('用户未登录，准备重定向到登录页面');
         const authBanner = document.getElementById('auth-banner');
         if (authBanner) {
           authBanner.style.display = '';
@@ -255,27 +255,30 @@ document.addEventListener('DOMContentLoaded', function() {
           // 如果提示区域不存在，直接跳转
           window.location.href = '/login.html?redirect=index';
         }
-        return;
+        return false;
       }
       
       // 检查用户是否已绑定手机号
       if (user && !user.phoneVerified) {
         alert('请先绑定手机号后再使用图像生成功能');
         window.location.href = '/bind-phone.html';
-        return;
+        return false;
       }
       
       // 检查用户是否有足够积分
       if (user.credits < 1) {
         alert('您的积分不足，请购买积分后再生成图像。');
         window.location.href = '/credits.html';
-        return;
+        return false;
       }
       
-      // 执行原来的提交逻辑
-      if (typeof originalSubmitEvent === 'function') {
-        originalSubmitEvent.call(this, e);
+      // 如果验证通过，调用script.js中的handleSubmit函数
+      if (typeof window.handleSubmit === 'function') {
+        window.handleSubmit(e);
+      } else {
+        // 如果找不到handleSubmit函数，使用正常的表单提交
+        uploadForm.submit();
       }
-    };
+    });
   }
 });
