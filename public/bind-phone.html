@@ -267,24 +267,9 @@
             // 绑定成功，跳转到首页
             window.location.href = '/index.html';
           } else if (result.message && result.message.includes('已被绑定')) {
-            // 手机号已被绑定，提示用户前往登录
-            phoneError.textContent = '该手机号已被其他账号绑定，请使用其他手机号或直接登录对应账号';
-            
-            // 添加登录按钮
-            if (!document.getElementById('goToLoginBtn')) {
-              const loginBtn = document.createElement('button');
-              loginBtn.id = 'goToLoginBtn';
-              loginBtn.className = 'btn btn-outline-primary w-100 mt-3';
-              loginBtn.textContent = '去登录该手机号对应账号';
-              loginBtn.onclick = function() {
-                window.location.href = '/login.html';
-              };
-              
-              // 插入登录按钮
-              bindBtn.parentNode.insertBefore(loginBtn, bindBtn.nextSibling);
-            }
-            
-            phoneError.style.display = 'block';
+            // 手机号已被绑定，直接重定向到登录页面
+            alert('该手机号已被其他账号绑定，将为您跳转到登录页面');
+            window.location.href = '/login.html';
           } else {
             codeError.textContent = result.message || '验证失败';
             codeError.style.display = 'block';

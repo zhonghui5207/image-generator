@@ -37,6 +37,90 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 检查是否需要刷新用户信息（积分等）
     fetchUserProfile();
+    
+    // 检查用户是否已绑定手机号，如果未绑定则禁用图像生成功能
+    if (!user.phoneVerified) {
+      const generateBtn = document.getElementById('generate-btn');
+      const uploadForm = document.getElementById('upload-form');
+      const formElements = uploadForm ? uploadForm.querySelectorAll('input, button, textarea, select') : [];
+      
+      // 禁用生成按钮
+      if (generateBtn) {
+        generateBtn.disabled = true;
+        generateBtn.title = '请先绑定手机号后再使用';
+        generateBtn.classList.remove('active');
+      }
+      
+      // 禁用表单所有输入元素
+      formElements.forEach(el => {
+        if (el.id !== 'generate-btn') {  // 避免重复禁用生成按钮
+          el.disabled = true;
+          el.title = '请先绑定手机号后再使用';
+        }
+      });
+      
+      // 添加手机绑定提示信息
+      const container = document.querySelector('.upload-container');
+      if (container) {
+        // 检查是否已经存在提示信息，避免重复添加
+        if (!document.getElementById('phone-verification-notice')) {
+          const notice = document.createElement('div');
+          notice.id = 'phone-verification-notice';
+          notice.className = 'phone-verification-notice';
+          notice.innerHTML = `
+            <div class="alert-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="alert-content">
+              <h3>需要绑定手机号</h3>
+              <p>为防止滥用及提供更好的服务，使用图像生成功能前请先绑定手机号。</p>
+              <a href="/bind-phone.html" class="bind-phone-btn">立即绑定手机号</a>
+            </div>
+          `;
+          container.prepend(notice);
+          
+          // 添加样式
+          const style = document.createElement('style');
+          style.textContent = `
+            .phone-verification-notice {
+              background-color: #fff3cd;
+              color: #856404;
+              padding: 15px;
+              margin-bottom: 20px;
+              border-radius: 8px;
+              border-left: 5px solid #ffc107;
+              display: flex;
+              align-items: center;
+              box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            }
+            .alert-icon {
+              font-size: 2rem;
+              margin-right: 15px;
+              color: #ffc107;
+            }
+            .alert-content h3 {
+              margin: 0 0 10px 0;
+              font-size: 1.2rem;
+            }
+            .alert-content p {
+              margin: 0 0 15px 0;
+            }
+            .bind-phone-btn {
+              background-color: #4a6bdf;
+              color: white;
+              padding: 8px 15px;
+              border-radius: 4px;
+              text-decoration: none;
+              display: inline-block;
+              transition: background-color 0.3s;
+            }
+            .bind-phone-btn:hover {
+              background-color: #3a5bcf;
+              transform: translateY(-2px);
+            }
+          `;
+          document.head.appendChild(style);
+        }
+      }
+    }
   } else {
     // 隐藏需要认证的元素，显示不需要认证的元素
     authRequiredElements.forEach(el => {
@@ -99,6 +183,11 @@ document.addEventListener('DOMContentLoaded', function() {
           usernameElement.textContent = data.user.username;
           usernameElement.style.display = '';
         }
+        
+        // 如果用户未绑定手机号，刷新页面以应用限制
+        if (!data.user.phoneVerified && window.location.pathname === '/') {
+          window.location.href = '/bind-phone.html';
+        }
       } else if (response.status === 401) {
         console.log('认证失败，执行登出操作');
         // 如果认证失败（token过期等），执行登出操作
@@ -158,6 +247,13 @@ document.addEventListener('DOMContentLoaded', function() {
           // 滚动到提示区域
           authBanner.scrollIntoView({ behavior: 'smooth' });
         }
+        return;
+      }
+      
+      // 检查用户是否已绑定手机号
+      if (user && !user.phoneVerified) {
+        alert('请先绑定手机号后再使用图像生成功能');
+        window.location.href = '/bind-phone.html';
         return;
       }
       

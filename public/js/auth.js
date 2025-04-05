@@ -37,7 +37,7 @@ async function checkPhoneVerification() {
   const isBindPhonePage = currentPath.includes('bind-phone.html');
   
   if (!user.phoneVerified && !isBindPhonePage) {
-    // 未绑定手机号且不在绑定页面，重定向到绑定页面
+    // 未绑定手机号且不在绑定页面，强制重定向到绑定页面
     window.location.href = '/bind-phone.html';
     return false;
   } else if (isBindPhonePage && user.phoneVerified) {
@@ -46,7 +46,7 @@ async function checkPhoneVerification() {
     return true;
   }
   
-  return true;
+  return user.phoneVerified; // 只有手机验证通过才返回true
 }
 
 // 用户登出
