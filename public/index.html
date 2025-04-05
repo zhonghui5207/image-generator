@@ -255,10 +255,26 @@
     <script>
       // 页面加载时检查用户是否已绑定手机号
       document.addEventListener('DOMContentLoaded', async () => {
-        // 检查用户是否已绑定手机号
-        await auth.checkPhoneVerification();
+        // 检查当前路径是不是绑定手机页面
+        const isBindPhonePage = window.location.pathname.includes('bind-phone.html');
+        if (isBindPhonePage) {
+          // 如果当前页面是绑定手机页面，则不执行重定向逻辑
+          return;
+        }
         
-        // 加载其他页面内容...
+        try {
+          // 获取用户信息，不主动重定向
+          const user = await auth.getCurrentUser();
+          if (user && !user.phoneVerified) {
+            // 用户已登录但未绑定手机，提示用户绑定手机号
+            const confirmRedirect = confirm('请绑定手机号以便使用完整功能。是否前往绑定页面？');
+            if (confirmRedirect) {
+              window.location.href = '/bind-phone.html';
+            }
+          }
+        } catch (error) {
+          console.error('检查用户状态出错:', error);
+        }
       });
     </script>
 </body>

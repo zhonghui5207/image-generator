@@ -49,73 +49,52 @@ document.addEventListener('DOMContentLoaded', () => {
     generatedImageContainer.style.display = 'none';
   }
   
-  // 提示词翻译函数，用于将英文提示词转换为中文
-  async function translatePrompt(prompt) {
-    try {
-      // 使用正则表达式检查是否包含英文字符
-      if (!prompt || !prompt.match(/[a-zA-Z]/)) {
-        return null; // 如果不包含英文，不需要翻译
-      }
-      
-      // 模拟翻译结果（如果没有后端翻译API）
-      // 注意：在实际应用中，应该调用后端翻译API
-      
-      // 常见英文提示词的翻译映射
-      const translations = {
-        'surreal': '超现实的',
-        'deep-sea': '深海',
-        'coral': '珊瑚',
-        'fish': '鱼',
-        'dreamlike': '梦幻般的',
-        'otherworldly': '异世界的',
-        'vibrant': '鲜艳的',
-        'colorful': '多彩的',
-        'vivid': '生动的',
-        'imaginative': '充满想象力的',
-        'ethereal': '空灵的',
-        'intricate': '复杂的',
-        'diverse': '多样化的',
-        'swimming': '游泳',
-        'scene': '场景'
-      };
-      
-      // 简单的翻译逻辑，将英文单词替换为中文
-      let translation = prompt;
-      Object.keys(translations).forEach(key => {
-        const regex = new RegExp(`\\b${key}\\b`, 'gi');
-        translation = translation.replace(regex, translations[key]);
-      });
-      
-      // 如果是文生图模式的提示词，添加翻译提示
-      if (currentMode === 'text-to-image' && !translation.includes('生成一张')) {
-        translation = `根据描述生成一张图像：${translation}`;
-      }
-      
-      return translation;
-      
-      // 实际应用中的API调用代码（当前未使用）
-      /*
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: prompt })
-      });
-      
-      if (!response.ok) {
-        throw new Error('翻译请求失败');
-      }
-      
-      const data = await response.json();
-      return data.translation;
-      */
-    } catch (error) {
-      console.error('翻译错误:', error);
-      return null;
-    }
+  // Functions for loading display
+  function updateLoadingStatus(statusText) {
+    const loadingStatus = document.getElementById('loading-status');
+    if (loadingStatus && statusText) loadingStatus.textContent = statusText;
   }
-  
+
+  // 简化的加载状态管理
+  function manageLoadingState() {
+    let intervalId = null;
+    const loadingMessages = [
+      '正在连接服务器，请稍候...',
+      '正在处理图像，请稍候...',
+      '正在生成创意内容，请稍候...',
+      '即将完成，最终处理中...'
+    ];
+    let currentMessageIndex = 0;
+    
+    return {
+      start: function() {
+        // 显示第一条消息
+        updateLoadingStatus(loadingMessages[0]);
+        
+        // 每5秒更换一条消息，轮流显示
+        intervalId = setInterval(() => {
+          currentMessageIndex = (currentMessageIndex + 1) % loadingMessages.length;
+          updateLoadingStatus(loadingMessages[currentMessageIndex]);
+        }, 5000);
+      },
+      
+      complete: function() {
+        clearInterval(intervalId);
+        updateLoadingStatus('生成完成！');
+      },
+      
+      reset: function() {
+        clearInterval(intervalId);
+        updateLoadingStatus('');
+      }
+    };
+  }
+
+  // 创建一个经过防抖处理的进度更新函数
+  const debouncedProgressUpdate = debounce((progress, value) => {
+    progress.update(value);
+  }, 300); // 300ms 的防抖延迟
+
   // 从服务器获取最新的用户信息
   async function fetchUserProfile() {
     const user = JSON.parse(localStorage.getItem('user') || 'null');
@@ -146,8 +125,121 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.reload();
       }
     } catch (error) {
-      // console.error('获取用户信息失败:', error);
+      console.error('获取用户信息失败:', error);
     }
+  }
+
+  // Functions for loading progress
+  function updateProgress(percent, statusText) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const loadingStatus = document.getElementById('loading-status');
+    
+    // 对百分比进行取整，避免小数
+    const roundedPercent = Math.round(percent);
+    
+    if (progressBar) {
+      // 确保 CSS 过渡效果生效
+      progressBar.style.transition = 'width 0.8s ease-in-out';
+      progressBar.style.width = `${roundedPercent}%`;
+    }
+    
+    if (progressText) progressText.textContent = `${roundedPercent}%`;
+    if (loadingStatus && statusText) loadingStatus.textContent = statusText;
+  }
+
+  // 模拟进度条 - 改进版，避免初始跳跃
+  function simulateProgress() {
+    let progressValue = 0;
+    let intervalId = null;
+    
+    return {
+      start: function() {
+        // 从5%开始，慢慢增加
+        progressValue = 5;
+        updateProgress(progressValue, '初始化中...');
+        
+        intervalId = setInterval(() => {
+          // 控制进度增加速度，让进度更平滑
+          let increment = 0;
+          
+          // 使用固定增量
+          if (progressValue < 15) {
+            // 前15%很慢，模拟初始化阶段
+            increment = 0.15;
+          } else if (progressValue < 40) {
+            // 15-40%稍快一些
+            increment = 0.25;
+          } else if (progressValue < 70) {
+            // 40-70%再稍快一些
+            increment = 0.15;
+          } else if (progressValue < 85) {
+            // 70-85%变慢，模拟最终处理阶段
+            increment = 0.08;
+          }
+          
+          // 限制最大进度为85%，等待完成信号
+          progressValue = Math.min(progressValue + increment, 85);
+          
+          // 根据不同进度阶段，显示不同状态消息
+          let statusMessage = '生成中，请稍候...';
+          if (progressValue < 15) {
+            statusMessage = '正在连接服务器，请稍候...';
+          } else if (progressValue < 40) {
+            statusMessage = '正在处理图像，请稍候...';
+          } else if (progressValue < 70) {
+            statusMessage = '正在生成创意内容，请稍候...';
+          } else {
+            statusMessage = '即将完成，最终处理中...';
+          }
+          
+          updateProgress(progressValue, statusMessage);
+        }, 800); // 每800毫秒更新一次
+      },
+      
+      update: function(percent) {
+        // 防止进度条跳跃：如果服务器返回的进度小于当前模拟进度，则忽略
+        if (percent > progressValue && percent <= 90) {
+          // 添加平滑过渡，不要直接跳到新值
+          const smoothIncrement = Math.min(2, (percent - progressValue) / 4);
+          progressValue = progressValue + smoothIncrement;
+          
+          updateProgress(progressValue, '接收数据中...');
+        }
+      },
+      
+      complete: function() {
+        clearInterval(intervalId);
+        progressValue = 100;
+        updateProgress(progressValue, '生成完成！');
+      },
+      
+      reset: function() {
+        clearInterval(intervalId);
+        progressValue = 0;
+        updateProgress(0, '');
+      }
+    };
+  }
+
+  // 提示词翻译函数，用于将英文提示词转换为中文
+  function translatePrompt(prompt) {
+    // 针对示例提示词的特定翻译
+    if (prompt.includes("A group of diverse men in casual clothing") && prompt.includes("Studio Ghibli animation")) {
+      return "一群穿着休闲服装的不同男性在户外汽车旁摆姿势，采用温暖柔和的色调和舒适友好的氛围，以吉卜力工作室动画风格呈现。图像应具有手绘、动画效果，柔和的光线、精致的细节和自然的环境。男性应该以温和、富有表现力的特征描绘，穿着现代休闲服装，带有轻松愉快的氛围。";
+    }
+    
+    // 针对预设风格的翻译
+    if (prompt.startsWith("将图片转换成")) {
+      return prompt; // 这些已经是中文，无需翻译
+    }
+    
+    // 如果是其他情况且是英文，返回一个通用提示（因为我们无法进行实时翻译）
+    if (/[a-zA-Z]/.test(prompt) && prompt.length > 30) {
+      return "生成图像的风格提示（原文为英文）";
+    }
+    
+    return prompt; // 默认不翻译
   }
 
   // Variables
@@ -383,176 +475,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // 创建一个经过防抖处理的进度更新函数
-  const debouncedProgressUpdate = debounce((progress, value) => {
-    progress.update(value);
-  }, 300); // 300ms 的防抖延迟
-  
-  // Functions for loading progress
-  function updateProgress(percent, statusText, estimatedTime) {
-    const progressBar = document.getElementById('progress-bar');
-    const progressText = document.getElementById('progress-text');
-    const loadingStatus = document.getElementById('loading-status');
-    const timeEstimate = document.getElementById('time-estimate');
-    
-    // 对百分比进行取整，避免小数
-    const roundedPercent = Math.round(percent);
-    
-    if (progressBar) {
-      // 确保 CSS 过渡效果生效
-      progressBar.style.transition = 'width 0.8s ease-in-out';
-      progressBar.style.width = `${roundedPercent}%`;
-    }
-    
-    if (progressText) progressText.textContent = `${roundedPercent}%`;
-    if (loadingStatus && statusText) loadingStatus.textContent = statusText;
-    
-    // 显示预估时间
-    if (timeEstimate && estimatedTime !== undefined) {
-      if (estimatedTime === 0) {
-        timeEstimate.style.display = 'none';
-      } else {
-        timeEstimate.style.display = 'block';
-        timeEstimate.textContent = `预计剩余时间: ${estimatedTime}秒`;
-      }
-    }
-  }
-  
-  // 模拟进度条 - 改进版，避免初始跳跃
-  function simulateProgress() {
-    let progressValue = 0;
-    let intervalId = null;
-    let startTime = Date.now();
-    const totalEstimatedTime = 60; // 默认估计生成需要60秒
-    let remainingTime = totalEstimatedTime;
-    let lastUpdateTime = Date.now();
-    let lastProgressValue = 0;
-    
-    return {
-      start: function() {
-        startTime = Date.now();
-        lastUpdateTime = Date.now();
-        // 从5%开始，慢慢增加
-        progressValue = 5;
-        lastProgressValue = progressValue;
-        updateProgress(progressValue, '初始化中...', remainingTime);
-        
-        intervalId = setInterval(() => {
-          // 计算已用时间和预估剩余时间
-          const elapsedSeconds = (Date.now() - startTime) / 1000;
-          const completionPercentage = progressValue / 100;
-          
-          // 根据当前进度，估计剩余时间
-          // 如果进度为0，避免除以零
-          if (completionPercentage > 0.05) {
-            remainingTime = Math.round((elapsedSeconds / completionPercentage) * (1 - completionPercentage));
-          } else {
-            remainingTime = totalEstimatedTime;
-          }
-          
-          // 控制进度增加速度，让进度更平滑
-          let increment = 0;
-          
-          // 根据已经过的时间调整增量 - 降低随机性，使用固定增量
-          if (progressValue < 15) {
-            // 前15%很慢，模拟初始化阶段
-            increment = 0.15;
-          } else if (progressValue < 40) {
-            // 15-40%稍快一些
-            increment = 0.25;
-          } else if (progressValue < 70) {
-            // 40-70%再稍快一些
-            increment = 0.15;
-          } else if (progressValue < 85) {
-            // 70-85%变慢，模拟最终处理阶段
-            increment = 0.08;
-          }
-          
-          // 限制最大进度为85%，等待完成信号
-          progressValue = Math.min(progressValue + increment, 85);
-          
-          // 根据不同进度阶段，显示不同状态消息
-          let statusMessage = '生成中，请稍候...';
-          if (progressValue < 15) {
-            statusMessage = '正在连接服务器，请稍候...';
-          } else if (progressValue < 40) {
-            statusMessage = '正在处理图像，请稍候...';
-          } else if (progressValue < 70) {
-            statusMessage = '正在生成创意内容，请稍候...';
-          } else {
-            statusMessage = '即将完成，最终处理中...';
-          }
-          
-          updateProgress(progressValue, statusMessage, remainingTime);
-        }, 800); // 每800毫秒更新一次
-      },
-      
-      update: function(percent) {
-        // 防止进度条跳跃：如果服务器返回的进度小于当前模拟进度，则忽略
-        if (percent > progressValue && percent <= 90) {
-          // 添加平滑过渡，不要直接跳到新值
-          const now = Date.now();
-          const timeDiff = now - lastUpdateTime;
-          
-          // 如果更新太快（小于2秒），或者进度差异太大（超过10%），进行平滑处理
-          if (timeDiff < 2000 || (percent - progressValue > 10)) {
-            // 平滑过渡：每次只增加一小部分
-            const smoothIncrement = Math.min(2, (percent - progressValue) / 4);
-            progressValue = progressValue + smoothIncrement;
-          } else {
-            // 在正常情况下，可以接受服务器返回的值，但也要防止跳跃
-            progressValue = Math.min(percent, progressValue + 5);
-          }
-          
-          // 计算剩余时间
-          const elapsedSeconds = (Date.now() - startTime) / 1000;
-          const completionPercentage = progressValue / 100;
-          if (completionPercentage > 0) {
-            remainingTime = Math.round((elapsedSeconds / completionPercentage) * (1 - completionPercentage));
-          }
-          
-          // 更新最后一次处理的值和时间
-          lastProgressValue = progressValue;
-          lastUpdateTime = now;
-          
-          updateProgress(progressValue, '接收数据中...', remainingTime);
-        }
-      },
-      
-      complete: function() {
-        clearInterval(intervalId);
-        progressValue = 100;
-        updateProgress(progressValue, '生成完成！', 0);
-      },
-      
-      reset: function() {
-        clearInterval(intervalId);
-        progressValue = 0;
-        updateProgress(0, '', 0);
-      }
-    };
-  }
-  
-  // 提示词翻译函数，用于将英文提示词转换为中文
-  function translatePrompt(prompt) {
-    // 针对示例提示词的特定翻译
-    if (prompt.includes("A group of diverse men in casual clothing") && prompt.includes("Studio Ghibli animation")) {
-      return "一群穿着休闲服装的不同男性在户外汽车旁摆姿势，采用温暖柔和的色调和舒适友好的氛围，以吉卜力工作室动画风格呈现。图像应具有手绘、动画效果，柔和的光线、精致的细节和自然的环境。男性应该以温和、富有表现力的特征描绘，穿着现代休闲服装，带有轻松愉快的氛围。";
-    }
-    
-    // 针对预设风格的翻译
-    if (prompt.startsWith("将图片转换成")) {
-      return prompt; // 这些已经是中文，无需翻译
-    }
-    
-    // 如果是其他情况且是英文，返回一个通用提示（因为我们无法进行实时翻译）
-    if (/[a-zA-Z]/.test(prompt) && prompt.length > 30) {
-      return "生成图像的风格提示（原文为英文）";
-    }
-    
-    return prompt; // 默认不翻译
-  }
-
   // 修改下载图片的函数
   function setupImageDownload(imageUrl) {
     // 创建一个临时链接用于下载而非预览
@@ -625,7 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 处理流式响应
   async function handleStreamResponse(formData) {
     try {
-      updateProgress(10, '建立流式连接...', 60);
+      updateProgress(10, '建立流式连接...');
       
       // 创建 EventSource 对象连接服务器发送的事件流
       const formDataForUrl = new URLSearchParams();
@@ -674,7 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let originalImagePath = '';
       let generatedImageUrl = '';
       
-      updateProgress(40, '接收数据中...', 60);
+      updateProgress(40, '接收数据中...');
       
       // 处理数据流
       try {
@@ -698,7 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     originalImagePath = data.content.originalImage;
                     originalImage.src = originalImagePath;
                   }
-                  updateProgress(50, '正在生成图像...', 60);
+                  updateProgress(50, '正在生成图像...');
                 } else if (data.type === 'content') {
                   // 内容块
                   const content = data.content;
@@ -816,7 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                   }
                   
-                  updateProgress(90, '处理生成的图像...', 60);
+                  updateProgress(90, '处理生成的图像...');
                 }
               } catch (e) {
                 console.error('解析数据错误:', e, '原始数据:', line.substring(6));
@@ -876,7 +798,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 显示加载状态
     uploadForm.parentElement.hidden = true;
     loadingIndicator.style.display = 'flex';
-    updateProgress(5, '准备上传文件...', 60);
+    updateProgress(5, '准备上传文件...');
 
     // 获取用户提示词
     const prompt = promptInput.value.trim() || '将图片转换成创意风格';
@@ -925,7 +847,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // 非流式响应处理（原有方式）
-      updateProgress(20, '上传图片中...', 60);
+      updateProgress(20, '上传图片中...');
 
       // 发送请求到服务器
       const response = await fetch('/api/generate-image', {
@@ -933,13 +855,13 @@ document.addEventListener('DOMContentLoaded', () => {
         body: formData
       });
 
-      updateProgress(50, '图片已上传，正在生成中...', 60);
+      updateProgress(50, '图片已上传，正在生成中...');
 
       const data = await response.json();
 
       if (data.success) {
         // 进度跳跃到90%
-        updateProgress(90, '生成成功，处理结果中...', 0);
+        updateProgress(90, '生成成功，处理结果中...');
         
         // 更新用户积分（从响应中获取或重新获取用户信息）
         if (data.updatedCredits !== undefined) {

@@ -426,7 +426,7 @@ main {
   width: 100%;
   height: 100%;
   background-color: rgba(0, 0, 0, 0.7);
-  display: none;
+  display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
@@ -486,16 +486,6 @@ main {
   margin: 5px 0;
   max-width: 70%;
   text-align: center;
-}
-
-.time-estimate {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.85rem;
-  margin: 10px 0;
-  padding: 5px 12px;
-  background-color: rgba(74, 107, 223, 0.3);
-  border-radius: 15px;
-  display: inline-block;
 }
 
 /* 生成图像容器样式 */

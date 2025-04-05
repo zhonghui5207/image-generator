@@ -31,10 +31,19 @@ async function checkPhoneVerification() {
     return false;
   }
   
-  if (!user.phoneVerified) {
-    // 未绑定手机号，重定向到绑定页面
+  // 获取当前页面URL路径
+  const currentPath = window.location.pathname;
+  // 检查是否已经在绑定手机号页面，避免重定向循环
+  const isBindPhonePage = currentPath.includes('bind-phone.html');
+  
+  if (!user.phoneVerified && !isBindPhonePage) {
+    // 未绑定手机号且不在绑定页面，重定向到绑定页面
     window.location.href = '/bind-phone.html';
     return false;
+  } else if (isBindPhonePage && user.phoneVerified) {
+    // 已绑定手机号但仍在绑定页面，重定向到首页
+    window.location.href = '/index.html';
+    return true;
   }
   
   return true;
