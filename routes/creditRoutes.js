@@ -19,7 +19,7 @@ router.get('/balance', authenticate, async (req, res) => {
   }
 });
 
-// 获取用户积分交易历史
+// 获取用户所有积分交易历史
 router.get('/transactions', authenticate, async (req, res) => {
   try {
     const transactions = await CreditTransaction.find({ user: req.user._id })
@@ -32,6 +32,46 @@ router.get('/transactions', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('获取积分交易历史错误:', error);
+    res.status(500).json({ success: false, message: '服务器错误' });
+  }
+});
+
+// 获取用户积分购买记录
+router.get('/purchases', authenticate, async (req, res) => {
+  try {
+    const purchases = await CreditTransaction.find({ 
+      user: req.user._id,
+      type: 'purchase'
+    })
+      .sort({ createdAt: -1 })
+      .limit(20);
+    
+    res.json({
+      success: true,
+      purchases
+    });
+  } catch (error) {
+    console.error('获取积分购买记录错误:', error);
+    res.status(500).json({ success: false, message: '服务器错误' });
+  }
+});
+
+// 获取用户积分使用记录
+router.get('/usage-history', authenticate, async (req, res) => {
+  try {
+    const records = await CreditTransaction.find({ 
+      user: req.user._id,
+      type: 'usage'
+    })
+      .sort({ createdAt: -1 })
+      .limit(20);
+    
+    res.json({
+      success: true,
+      records
+    });
+  } catch (error) {
+    console.error('获取积分使用记录错误:', error);
     res.status(500).json({ success: false, message: '服务器错误' });
   }
 });

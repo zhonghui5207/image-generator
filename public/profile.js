@@ -560,8 +560,8 @@ document.addEventListener('DOMContentLoaded', function() {
       // 显示加载中状态
       usageList.innerHTML = '<p class="loading-message"><i class="fas fa-spinner fa-spin"></i> 正在加载使用记录...</p>';
       
-      // 尝试从服务器获取数据
-      const response = await fetch('/api/credits/usage', {
+      // 尝试从服务器获取数据 - 确保获取的是使用记录而非购买记录
+      const response = await fetch('/api/credits/usage-history', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -574,17 +574,17 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data.records && data.records.length > 0) {
           displayUsageRecords(data.records);
         } else {
-          // 没有记录，显示模拟数据
-          displayMockUsageRecords();
+          // 没有记录，显示空状态
+          usageList.innerHTML = '<p class="empty-list">暂无使用记录</p>';
         }
       } else {
-        // API调用失败，显示模拟数据
-        displayMockUsageRecords();
+        // API调用失败，显示错误状态
+        usageList.innerHTML = '<p class="empty-list">无法加载使用记录</p>';
       }
     } catch (error) {
       console.error('获取积分使用记录失败:', error);
-      // 发生错误，显示模拟数据
-      displayMockUsageRecords();
+      // 发生错误，显示错误状态
+      usageList.innerHTML = '<p class="empty-list">加载使用记录时出错</p>';
     }
   }
   
@@ -607,54 +607,6 @@ document.addEventListener('DOMContentLoaded', function() {
       item.innerHTML = `
         <div class="transaction-date">${date}</div>
         <div class="transaction-details">${record.description || '生成图像'}</div>
-        <div class="transaction-amount negative">-${creditsUsed} 积分</div>
-      `;
-      
-      usageList.appendChild(item);
-    });
-  }
-  
-  // 显示模拟积分使用记录
-  function displayMockUsageRecords() {
-    if (!usageList) return;
-    
-    // 生成当前时间和近期时间
-    const now = new Date();
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-    
-    // 格式化时间
-    const formatDate = (date) => {
-      return date.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      });
-    };
-    
-    // 模拟使用记录 - 根据不同模型设置正确的积分消耗
-    const mockUsageRecords = [
-      { date: formatDate(now), description: '生成图像 (标准模式)', amount: 4 },
-      { date: formatDate(fiveMinutesAgo), description: '生成图像 (高级模式)', amount: 5 }
-    ];
-    
-    // 清空现有内容
-    usageList.innerHTML = '';
-    
-    // 添加模拟使用记录
-    mockUsageRecords.forEach(record => {
-      const item = document.createElement('div');
-      item.className = 'transaction-item';
-      
-      // 根据模型名称确定消耗的积分
-      let creditsUsed = record.amount;
-      
-      item.innerHTML = `
-        <div class="transaction-date">${record.date}</div>
-        <div class="transaction-details">${record.description}</div>
         <div class="transaction-amount negative">-${creditsUsed} 积分</div>
       `;
       

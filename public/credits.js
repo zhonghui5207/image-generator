@@ -186,8 +186,8 @@ document.addEventListener('DOMContentLoaded', function() {
       // 显示加载中状态
       purchaseList.innerHTML = '<p class="loading-message"><i class="fas fa-spinner fa-spin"></i> 正在加载购买记录...</p>';
       
-      // 尝试获取交易记录
-      const response = await fetch('/api/credits/transactions', {
+      // 尝试获取购买记录
+      const response = await fetch('/api/credits/purchases', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -198,8 +198,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = await response.json();
         
         // 处理数据
-        if (data.transactions && data.transactions.length > 0) {
-          displayPurchaseRecords(data.transactions);
+        if (data.purchases && data.purchases.length > 0) {
+          displayPurchaseRecords(data.purchases);
         } else {
           // 没有记录
           purchaseList.innerHTML = '<p class="empty-list">暂无购买记录</p>';
