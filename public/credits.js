@@ -100,50 +100,109 @@ document.addEventListener('DOMContentLoaded', function() {
     confirmPaymentBtn.addEventListener('click', async function() {
       if (!selectedPackage) return;
       
-      try {
-        // 套餐ID映射：将字符串ID映射到数字ID
-        let packageId;
-        switch (selectedPackage.id) {
-          case 'basic':
-            packageId = 1;
-            break;
-          case 'standard':
-            packageId = 2;
-            break;
-          case 'premium':
-            packageId = 3;
-            break;
-          default:
-            alert('无效的套餐ID');
-            return;
-        }
-        
-        // 发送购买请求到支付系统创建订单
-        const response = await fetch('/api/payment/create-order', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            packageId: packageId,
-            paymentMethod: 'wechat' // 固定使用微信支付
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.success) {
-          // 关闭当前模态框
-          paymentModal.style.display = 'none';
+      // 禁用按钮防止重复点击
+      confirmPaymentBtn.disabled = true;
+      confirmPaymentBtn.textContent = '处理中...';
+      
+      let retryCount = 0;
+      const maxRetries = 3;
+      let success = false;
+      
+      while (!success && retryCount < maxRetries) {
+        try {
+          // 套餐ID映射：将字符串ID映射到数字ID
+          let packageId;
+          switch (selectedPackage.id) {
+            case 'basic':
+              packageId = 1;
+              break;
+            case 'standard':
+              packageId = 2;
+              break;
+            case 'premium':
+              packageId = 3;
+              break;
+            default:
+              alert('无效的套餐ID');
+              confirmPaymentBtn.disabled = false;
+              confirmPaymentBtn.textContent = '确认支付';
+              return;
+          }
           
-          // 打开二维码支付页面
-          window.location.href = `/payment.html?order=${data.order.orderNumber}`;
-        } else {
-          alert(`创建订单失败: ${data.message || '请稍后再试'}`);
+          // 发送购买请求到支付系统创建订单
+          const response = await fetch('/api/payment/create-order', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              packageId: packageId,
+              paymentMethod: 'wechat' // 固定使用微信支付
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (response.ok && data.success) {
+            // 标记成功，退出循环
+            success = true;
+            
+            // 关闭当前模态框
+            paymentModal.style.display = 'none';
+            
+            // 打开二维码支付页面
+            window.location.href = `/payment.html?order=${data.order.orderNumber}`;
+          } else {
+            // 检查是否是订单号重复错误或需要重试的错误
+            const needRetry = data.needRetry || 
+              (data.error && (
+                data.error.includes('订单号重复') || 
+                data.error.includes('201')
+              )) ||
+              (data.payment && data.payment.needRetry);
+            
+            if (needRetry && retryCount < maxRetries - 1) {
+              // 如果需要重试且未达到最大重试次数
+              retryCount++;
+              console.log(`创建订单失败，正在重试 (${retryCount}/${maxRetries}): ${data.message}`);
+              confirmPaymentBtn.textContent = `正在重试 (${retryCount}/${maxRetries})...`;
+              
+              // 稍微等待一下再重试
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } else {
+              // 重试次数已达上限或无需重试
+              alert(`创建订单失败: ${data.message || '请稍后再试'}`);
+              confirmPaymentBtn.disabled = false;
+              confirmPaymentBtn.textContent = '确认支付';
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('购买积分错误:', error);
+          
+          if (retryCount < maxRetries - 1) {
+            // 如果未达到最大重试次数，继续重试
+            retryCount++;
+            console.log(`请求失败，正在重试 (${retryCount}/${maxRetries})`);
+            confirmPaymentBtn.textContent = `正在重试 (${retryCount}/${maxRetries})...`;
+            
+            // 稍微等待一下再重试
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } else {
+            // 重试次数已达上限
+            alert('购买请求失败，请稍后再试');
+            confirmPaymentBtn.disabled = false;
+            confirmPaymentBtn.textContent = '确认支付';
+            return;
+          }
         }
-      } catch (error) {
-        console.error('购买积分错误:', error);
-        alert('购买请求失败，请稍后再试');
+      }
+      
+      // 如果所有重试都失败
+      if (!success) {
+        confirmPaymentBtn.disabled = false;
+        confirmPaymentBtn.textContent = '确认支付';
+        alert('创建订单失败，请稍后再试');
       }
     });
   }

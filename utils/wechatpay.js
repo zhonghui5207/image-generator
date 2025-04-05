@@ -210,19 +210,34 @@ export async function createWechatPayment(orderData) {
       
       // 特殊处理订单号重复错误
       if (result.err_code === 'INVALID_REQUEST' && result.err_code_des && result.err_code_des.includes('商户订单号重复')) {
-        console.error(`微信支付业务失败: ${result.err_code} ${result.err_code_des}`);
-        console.log(`完整响应结果: ${JSON.stringify(result)}`);
+        console.error(`微信支付业务失败 - 订单号重复 [${orderData.orderNumber}]: ${result.err_code} ${result.err_code_des}`);
+        console.log(`订单号: [${orderData.orderNumber}], 金额: ${orderData.amount}元, 完整响应结果: ${JSON.stringify(result)}`);
         
         // 尝试再次查询订单状态
         try {
-          console.log(`订单号重复, 尝试查询该订单的状态: ${orderData.orderNumber}`);
+          console.log(`订单号重复 [${orderData.orderNumber}], 尝试查询该订单的状态`);
           const duplicateOrderStatus = await queryOrderStatus(orderData.orderNumber);
           
+          console.log(`查询重复订单 [${orderData.orderNumber}] 结果:`, JSON.stringify(duplicateOrderStatus));
+          
           if (duplicateOrderStatus.success) {
-            console.log(`成功查询到重复订单状态: ${JSON.stringify(duplicateOrderStatus)}`);
+            console.log(`成功查询到重复订单 [${orderData.orderNumber}] 状态:`, JSON.stringify(duplicateOrderStatus));
+            
+            // 如果订单已支付，返回支付成功状态
+            if (duplicateOrderStatus.isPaid) {
+              console.log(`订单 [${orderData.orderNumber}] 已支付完成，直接返回已支付状态`);
+              return {
+                success: true,
+                isPaid: true,
+                orderNumber: orderData.orderNumber,
+                amount: orderData.amount,
+                message: '订单已支付'
+              };
+            }
             
             // 如果订单已经在微信支付系统中，且有二维码，则直接使用
             if (duplicateOrderStatus.codeUrl) {
+              console.log(`使用订单 [${orderData.orderNumber}] 已存在的支付二维码URL`);
               return {
                 success: true,
                 codeUrl: duplicateOrderStatus.codeUrl,
@@ -233,21 +248,61 @@ export async function createWechatPayment(orderData) {
                 message: '使用已存在的支付二维码'
               };
             }
+            
+            // 如果订单未支付但也没有二维码，尝试关闭旧订单并返回错误
+            try {
+              console.log(`尝试关闭旧订单 [${orderData.orderNumber}]`);
+              const closeResult = await closeOrder(orderData.orderNumber);
+              console.log(`关闭旧订单 [${orderData.orderNumber}] 结果:`, JSON.stringify(closeResult));
+              
+              if (closeResult.success) {
+                console.log(`成功关闭旧订单 [${orderData.orderNumber}], 建议创建新订单`);
+                return {
+                  success: false,
+                  message: `订单号重复，已成功关闭旧订单，请创建新订单`,
+                  needRetry: true,
+                  error: result,
+                  duplicateStatus: duplicateOrderStatus
+                };
+              } else {
+                console.error(`关闭旧订单 [${orderData.orderNumber}] 失败:`, closeResult);
+                return {
+                  success: false,
+                  message: `订单号重复且无法关闭旧订单: ${result.err_code_des}`,
+                  needRetry: true,
+                  error: result,
+                  closeError: closeResult
+                };
+              }
+            } catch (closeError) {
+              console.error(`关闭旧订单 [${orderData.orderNumber}] 发生异常:`, closeError);
+              return {
+                success: false,
+                message: `订单号重复且关闭旧订单时出错: ${closeError.message || result.err_code_des}`,
+                needRetry: true,
+                error: result,
+                closeError
+              };
+            }
           }
           
           // 返回错误和查询状态结果
+          console.log(`无法完整查询到订单 [${orderData.orderNumber}] 状态, 建议创建新订单`);
           return {
             success: false,
-            message: `订单号重复: ${result.err_code_des}`,
+            message: `订单号重复但状态未知: ${result.err_code_des}`,
             error: result,
-            duplicateStatus: duplicateOrderStatus
+            duplicateStatus: duplicateOrderStatus,
+            needRetry: true
           };
         } catch (statusError) {
-          console.error(`尝试查询重复订单状态失败:`, statusError);
+          console.error(`尝试查询重复订单 [${orderData.orderNumber}] 状态失败:`, statusError);
           return {
             success: false,
             message: `订单号重复且无法查询状态: ${result.err_code_des}`,
-            error: result
+            error: result,
+            statusError,
+            needRetry: true
           };
         }
       }
@@ -297,6 +352,9 @@ export async function queryOrderStatus(orderNumber) {
   try {
     console.log('查询订单状态:', orderNumber);
     
+    // 先尝试从本地数据库获取订单信息
+    const localOrder = await getLocalOrder(orderNumber);
+    
     // 构建查询参数
     const params = {
       appid: config.appId,
@@ -340,26 +398,12 @@ export async function queryOrderStatus(orderNumber) {
           timeEnd: result.time_end || ''
         };
         
-        // 如果订单存在但未支付，尝试获取二维码URL
-        if (!isPaid) {
-          try {
-            // 查询该订单在微信支付系统中的二维码URL
-            // 如果已经有存储的codeUrl，优先使用
-            const localOrder = await getLocalOrder(orderNumber);
-            if (localOrder && localOrder.metadata && localOrder.metadata.codeUrl) {
-              console.log(`从本地订单记录找到了二维码URL`);
-              orderResult.codeUrl = localOrder.metadata.codeUrl;
-            } else {
-              // 如果本地没有，尝试重新获取
-              console.log(`本地没有存储二维码URL，尝试重新获取`);               
-              // 注意：这里只是一个实现思路，实际上微信不提供直接获取二维码的API
-              // 但我们可以通过关闭订单后重新创建来获取新的二维码
-              // 这里为了简化逻辑，先不实现
-            }
-          } catch (error) {
-            console.error('获取订单二维码失败:', error);
-            // 失败不影响返回订单状态
-          }
+        // 如果有本地存储的二维码URL，添加到结果中
+        if (localOrder && localOrder.metadata && localOrder.metadata.codeUrl) {
+          console.log(`从本地订单记录找到了二维码URL: ${localOrder.metadata.codeUrl}`);
+          orderResult.codeUrl = localOrder.metadata.codeUrl;
+        } else {
+          console.log(`本地订单记录没有存储二维码URL`);
         }
         
         return orderResult;
@@ -367,6 +411,18 @@ export async function queryOrderStatus(orderNumber) {
         // 订单不存在判断
         const notExist = result.err_code === 'ORDERNOTEXIST';
         console.log(`订单状态查询失败, 订单号: ${orderNumber}, 错误码: ${result.err_code}, 存在状态: ${!notExist}`);
+        
+        // 即使订单不存在于微信支付系统，但如果本地有记录且有二维码URL，也可以返回
+        if (notExist && localOrder && localOrder.metadata && localOrder.metadata.codeUrl) {
+          console.log(`微信支付系统中不存在订单，但本地有二维码URL，标记为不存在但返回二维码URL`);
+          return {
+            success: false,
+            message: result.err_code_des || '订单查询失败',
+            error: result,
+            exists: false,
+            codeUrl: localOrder.metadata.codeUrl
+          };
+        }
         
         return {
           success: false,
@@ -377,6 +433,19 @@ export async function queryOrderStatus(orderNumber) {
       }
     } else {
       console.error(`查询订单通信失败: ${result.return_msg}`);
+      
+      // 通信失败但本地有记录，依然可以继续使用本地的二维码
+      if (localOrder && localOrder.metadata && localOrder.metadata.codeUrl) {
+        console.log(`微信支付通信失败，但本地有二维码URL，返回本地URL`);
+        return {
+          success: false,
+          message: result.return_msg || '通信失败',
+          error: result,
+          exists: false,
+          codeUrl: localOrder.metadata.codeUrl
+        };
+      }
+      
       return {
         success: false,
         message: result.return_msg || '通信失败',
@@ -386,6 +455,24 @@ export async function queryOrderStatus(orderNumber) {
     }
   } catch (error) {
     console.error('查询订单状态失败:', error);
+    
+    // 即使查询失败，依然尝试从本地获取订单信息
+    try {
+      const localOrder = await getLocalOrder(orderNumber);
+      if (localOrder && localOrder.metadata && localOrder.metadata.codeUrl) {
+        console.log(`查询订单状态出错，但找到了本地存储的二维码URL，返回本地URL`);
+        return {
+          success: false,
+          message: error.message || '查询订单失败',
+          error: error.toString(),
+          exists: false,
+          codeUrl: localOrder.metadata.codeUrl
+        };
+      }
+    } catch (localError) {
+      console.error('获取本地订单信息也失败:', localError);
+    }
+    
     return {
       success: false,
       message: error.message || '查询订单失败',
