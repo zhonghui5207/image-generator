@@ -763,6 +763,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // 设置下载和预览功能
                     setupImageDownload(generatedImageUrl);
+                    
+                    // 显示结果容器，隐藏上传表单
+                    uploadForm.parentElement.hidden = true;
+                    resultContainer.hidden = false;
                   }
                   
                   // 显示提示词信息 - 使用API返回的提示词
@@ -821,6 +825,18 @@ document.addEventListener('DOMContentLoaded', () => {
       loadingIndicator.style.display = 'none';
       uploadForm.parentElement.hidden = false;
       resultContainer.hidden = true;
+    } finally {
+      // 如果生成成功，完成进度条并隐藏加载指示器
+      if (generatedImageUrl) {
+        updateProgress(100, '生成完成！');
+        // 延迟隐藏加载指示器
+        setTimeout(() => {
+          loadingIndicator.style.display = 'none';
+          // 确保结果容器显示
+          resultContainer.hidden = false;
+          uploadForm.parentElement.hidden = true;
+        }, 500);
+      }
     }
   }
   
@@ -1195,4 +1211,30 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.error('Cannot initialize modes: missing required elements');
   }
+
+  // 检查并更新界面状态，确保结果正确显示
+  function checkAndUpdateUIState() {
+    // 检查生成的图像是否有效
+    const isGeneratedImageValid = generatedImage && generatedImage.src && 
+                                  generatedImage.src !== '#' && 
+                                  generatedImage.src !== 'about:blank';
+    
+    // 如果图像有效但结果容器被隐藏，则显示结果容器
+    if (isGeneratedImageValid && resultContainer.hidden) {
+      console.log('检测到有效的生成图像，但结果容器被隐藏，正在修复UI状态');
+      resultContainer.hidden = false;
+      uploadForm.parentElement.hidden = true;
+      
+      // 确保图像容器可见
+      if (generatedImageContainer) {
+        generatedImageContainer.style.display = 'block';
+      }
+      
+      // 隐藏加载指示器
+      loadingIndicator.style.display = 'none';
+    }
+  }
+  
+  // 定期检查UI状态
+  setInterval(checkAndUpdateUIState, 1000);
 });
