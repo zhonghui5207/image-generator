@@ -358,13 +358,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Remove image button
   removeImageBtn.addEventListener('click', removeImage);
 
-  // Form submission
-  uploadForm.addEventListener('submit', handleSubmit);
-  
-  // 生成按钮不需要额外的点击事件，因为它是表单的提交按钮
-  // 表单的submit事件已经绑定了handleSubmit函数
-  // 不需要额外的事件处理器，否则会导致重复提交
-
   // New generation button
   newGenerationBtn.addEventListener('click', resetForm);
 
