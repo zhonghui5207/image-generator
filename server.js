@@ -9,6 +9,8 @@ import https from 'https';
 import cookieParser from 'cookie-parser';
 import mongoose from './models/db.js';
 import ossClient, { uploadToOSS, uploadFromSourceToOSS, checkOssConfig } from './utils/ossClient.js';
+// 兼容性导入fetch
+import fetch from 'node-fetch';
 
 // 导入路由
 import authRoutes from './routes/authRoutes.js';
@@ -198,6 +200,16 @@ function image2Base64(imagePath) {
 
 // API endpoint for image generation
 app.post('/api/generate-image', authenticate, checkCredits, upload.single('image'), processFileWithOSS, async (req, res) => {
+  // 声明一些可能在错误处理中使用的变量
+  let imagePath = null;
+  let imageType = null;
+  let originalImagePath = null;
+  let mode = 'unknown';
+  let selectedModel = process.env.OPENAI_MODEL || 'unknown';
+  let prompt = '';
+  let creditsToUse = 1;
+  let tempImageHistory = null;
+  
   // 设置错误处理函数以确保统一处理所有错误
   const handleError = async (error, statusCode = 500, errorMessage = 'Error processing image') => {
     console.error(`[${new Date().toISOString()}] Image generation error:`, error);
@@ -210,6 +222,7 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
       const failureCreditsToUse = 1;
       
       // 设置一个有效的生成图像URL，即使是占位符
+      // 安全地使用originalImagePath变量
       const placeholderImage = originalImagePath || 'https://placehold.co/600x400?text=生成失败';
       
       // 保存失败记录
@@ -383,17 +396,14 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
   
   try {
     // 获取生成模式
-    const mode = req.body.mode || 'image-to-image';
+    mode = req.body.mode || 'image-to-image';
     
     // 检查图生图模式是否需要图片
     if (mode === 'image-to-image' && !req.file) {
       return res.status(400).json({ error: '图生图模式需要上传图片' });
     }
 
-    const prompt = req.body.prompt || 'Transform this image into a creative style';
-    let imagePath = null;
-    let imageType = null;
-    let originalImagePath = null;
+    prompt = req.body.prompt || 'Transform this image into a creative style';
     
     // 只有图生图模式才处理图片
     if (mode === 'image-to-image' && req.file) {
@@ -422,13 +432,10 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
     }
     
     // 获取所选模型，如果没有指定则使用环境变量中的默认值
-    const selectedModel = req.body.model || process.env.OPENAI_MODEL;
+    selectedModel = req.body.model || process.env.OPENAI_MODEL;
     console.log("Selected model:", selectedModel);
     
     // 确定消耗的积分数量
-    let creditsToUse;
-    
-    // 根据不同模型设置积分消耗
     switch (selectedModel) {
       case 'gpt-4-vision-preview':
         creditsToUse = 2; // 快速稳定出图，质量一般，DELL生图
@@ -914,4 +921,13 @@ app.listen(port, () => {
   }
   console.log(`- 本地上传目录: ${path.join(__dirname, 'uploads')}`);
   console.log('----------------------------------------');
+});
+
+// 全局未捕获异常处理
+process.on('uncaughtException', (err) => {
+  console.error('未捕获的异常:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('未处理的拒绝:', reason);
 });

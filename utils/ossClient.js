@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+// 兼容性导入fetch
+import fetch from 'node-fetch';
 
 // 加载环境变量
 dotenv.config();
@@ -124,9 +126,20 @@ export async function uploadFromSourceToOSS(source, customPath = 'kdy-generated/
       result = await ossClient.put(ossPath, fileContent);
     } else {
       // URL，需要先下载
-      const response = await fetch(source);
-      const buffer = await response.arrayBuffer();
-      result = await ossClient.put(ossPath, Buffer.from(buffer));
+      const response = await fetch(source, {
+        timeout: 30000, // 30秒超时
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP错误，状态: ${response.status}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      result = await ossClient.put(ossPath, buffer);
     }
     
     // 生成可访问的URL
