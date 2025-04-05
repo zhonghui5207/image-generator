@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from '../utils/auth.js';
 import Order from '../models/Order.js';
 import User from '../models/User.js';
-import { createWechatPayment, verifyNotifySign, queryOrderStatus } from '../utils/wechatpay.js';
+import { createWechatPayment, verifyNotifySign, queryOrderStatus, closeOrder } from '../utils/wechatpay.js';
 import { addCredits } from './creditRoutes.js';
 import dotenv from 'dotenv';
 
@@ -13,8 +13,8 @@ const router = express.Router();
 
 // 生成订单号
 function generateOrderNumber() {
-  const timestamp = new Date().getTime().toString().substring(0, 10);
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  const timestamp = new Date().getTime().toString();
+  const random = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
   return `ORD${timestamp}${random}`;
 }
 
@@ -274,24 +274,45 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
       };
     } else {
       // 没有存储二维码URL，生成新的支付二维码
-      if (order.paymentMethod === 'wechat') {
-        // 调用微信支付获取二维码
-        paymentResult = await createWechatPayment({
-          orderNumber,
-          amount: order.amount,
-          body: order.description || `AI绘画平台-积分充值`,
-          ip: req.ip
-        });
-        
-        // 如果成功获取了二维码URL，保存到订单元数据中
-        if (paymentResult.success && paymentResult.codeUrl) {
-          order.metadata = order.metadata || {};
-          order.metadata.codeUrl = paymentResult.codeUrl;
-          await order.save();
+      try {
+        if (order.paymentMethod === 'wechat') {
+          // 调用微信支付获取二维码
+          paymentResult = await createWechatPayment({
+            orderNumber,
+            amount: order.amount,
+            body: order.description || `AI绘画平台-积分充值`,
+            ip: req.ip
+          });
+          
+          // 如果成功获取了二维码URL，保存到订单元数据中
+          if (paymentResult.success && paymentResult.codeUrl) {
+            order.metadata = order.metadata || {};
+            order.metadata.codeUrl = paymentResult.codeUrl;
+            await order.save();
+          }
+        } else if (order.paymentMethod === 'alipay') {
+          // 调用支付宝支付（这里需要再实现）
+          paymentResult = { success: false, message: '支付宝支付功能尚未实现' };
         }
-      } else if (order.paymentMethod === 'alipay') {
-        // 调用支付宝支付（这里需要再实现）
-        paymentResult = { success: false, message: '支付宝支付功能尚未实现' };
+      } catch (error) {
+        console.error('生成支付二维码错误:', error);
+        paymentResult = { 
+          success: false, 
+          message: error.message || '生成支付二维码失败'
+        };
+        
+        // 如果是商户订单号重复错误，则尝试查询订单状态
+        if (error.message && error.message.includes('201')) {
+          try {
+            const statusResult = await queryOrderStatus(orderNumber);
+            if (statusResult.success) {
+              // 返回查询到的状态
+              paymentResult.orderStatus = statusResult;
+            }
+          } catch (statusError) {
+            console.error('查询重复订单状态错误:', statusError);
+          }
+        }
       }
     }
     

@@ -300,7 +300,7 @@
         </div>
     </div>
 
-    <footer>
+    <footer class="text-center">
         <p>© 2025 柯达鸭 AI 图像生成器 | 使用 OpenAI GPT-4o</p>
     </footer>
 
@@ -355,6 +355,14 @@
             document.getElementById('checkStatusBtn').addEventListener('click', function() {
                 if (currentOrder) {
                     checkOrderStatus(currentOrder.orderNumber);
+                    // 显示检查中状态
+                    this.innerHTML = '<div class="loading me-2"></div> 检查中...';
+                    this.disabled = true;
+                    // 2秒后恢复按钮状态
+                    setTimeout(() => {
+                        this.innerHTML = '<i class="fas fa-sync-alt"></i> 检查支付状态';
+                        this.disabled = false;
+                    }, 2000);
                 }
             });
             
@@ -761,6 +769,10 @@
                         }
                     });
                     
+                    if (!response.ok) {
+                        throw new Error(`HTTP error ${response.status}`);
+                    }
+                    
                     const data = await response.json();
                     
                     if (data.success) {
@@ -810,9 +822,11 @@
                         }
                     } else {
                         console.error('查询订单状态失败:', data.message);
+                        alert('查询订单状态失败: ' + data.message);
                     }
                 } catch (error) {
                     console.error('查询订单状态错误:', error);
+                    alert('查询订单状态错误: ' + error.message);
                 }
             }
             
