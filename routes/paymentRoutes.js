@@ -59,8 +59,50 @@ router.post('/create-order', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: '无效的套餐ID' });
     }
     
-    // 生成唯一订单号
-    const orderNumber = generateOrderNumber();
+    // 生成唯一订单号 - 确保不会重复
+    let orderNumber;
+    let orderExists = true;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    
+    // 循环尝试生成唯一订单号，并检查是否已存在
+    while (orderExists && retryCount < MAX_RETRIES) {
+      // 生成新的订单号
+      orderNumber = generateOrderNumber();
+      
+      // 检查数据库中是否已存在此订单号
+      const existingDbOrder = await Order.findOne({ orderNumber });
+      if (existingDbOrder) {
+        retryCount++;
+        continue; // 数据库中存在，继续尝试
+      }
+      
+      // 如果是微信支付，检查支付平台是否存在此订单
+      if (paymentMethod === 'wechat') {
+        try {
+          const existingOrder = await queryOrderStatus(orderNumber);
+          // 如果查询成功且订单存在，继续尝试新的订单号
+          if (existingOrder.success && existingOrder.exists) {
+            retryCount++;
+            continue;
+          }
+        } catch (error) {
+          // 查询出错，可能是订单不存在，可以继续使用
+          console.log('查询订单出错，假定订单不存在:', error.message);
+        }
+      }
+      
+      // 走到这里表示订单号在数据库和支付平台都不存在
+      orderExists = false;
+    }
+    
+    // 如果重试多次后仍不能生成唯一订单号，返回错误
+    if (orderExists) {
+      return res.status(500).json({ 
+        success: false, 
+        message: '无法生成唯一订单号，请稍后再试' 
+      });
+    }
     
     // 设置订单过期时间（30分钟后）
     const expiredAt = new Date(Date.now() + 30 * 60 * 1000);
@@ -81,34 +123,94 @@ router.post('/create-order', authenticate, async (req, res) => {
       }
     });
     
+    // 先保存订单
     await order.save();
     
     // 根据不同支付方式调用相应的支付接口
     let paymentResult;
     
-    if (paymentMethod === 'wechat') {
-      // 调用微信支付
-      paymentResult = await createWechatPayment({
-        orderNumber,
-        amount: selectedPackage.price,
-        body: `AI绘画平台-${selectedPackage.name}`,
-        ip: req.ip
-      });
-    } else if (paymentMethod === 'alipay') {
-      // 调用支付宝支付（这里需要再实现）
-      paymentResult = { success: false, message: '支付宝支付功能尚未实现' };
+    try {
+      if (paymentMethod === 'wechat') {
+        // 调用微信支付
+        paymentResult = await createWechatPayment({
+          orderNumber,
+          amount: selectedPackage.price,
+          body: `AI绘画平台-${selectedPackage.name}`,
+          ip: req.ip
+        });
+      } else if (paymentMethod === 'alipay') {
+        // 调用支付宝支付（这里需要再实现）
+        paymentResult = { success: false, message: '支付宝支付功能尚未实现' };
+      }
+      
+      // 如果支付接口调用成功，保存支付二维码URL
+      if (paymentResult.success && paymentResult.codeUrl) {
+        order.metadata.codeUrl = paymentResult.codeUrl;
+        await order.save();
+      }
+    } catch (error) {
+      // 捕获支付接口调用异常
+      console.error('调用支付接口错误:', error);
+      
+      // 处理订单号重复问题
+      if (error.message && (error.message.includes('201') || error.message.includes('订单号重复'))) {
+        try {
+          // 查询订单状态
+          const statusResult = await queryOrderStatus(orderNumber);
+          
+          if (statusResult.success && statusResult.exists) {
+            // 如果订单存在但未支付，使用已有订单信息
+            if (!statusResult.isPaid && statusResult.codeUrl) {
+              // 如果获取到了二维码URL，保存到订单中
+              order.metadata.codeUrl = statusResult.codeUrl;
+              await order.save();
+              
+              paymentResult = {
+                success: true,
+                codeUrl: statusResult.codeUrl,
+                message: '使用已存在的支付订单'
+              };
+            } else {
+              // 无法获取原始二维码，返回错误
+              paymentResult = { 
+                success: false, 
+                message: '订单号已存在，但无法获取支付二维码，请刷新页面重试',
+                orderStatus: statusResult
+              };
+            }
+          } else {
+            // 订单不存在，可能是其他原因导致的错误
+            paymentResult = {
+              success: false,
+              message: '创建支付订单失败: ' + error.message
+            };
+          }
+        } catch (statusError) {
+          console.error('查询订单状态错误:', statusError);
+          paymentResult = { 
+            success: false, 
+            message: '创建支付失败，请刷新页面重试: ' + error.message 
+          };
+        }
+      } else {
+        // 其他类型的错误
+        paymentResult = {
+          success: false,
+          message: error.message || '创建支付订单失败'
+        };
+      }
     }
     
-    if (!paymentResult.success) {
+    if (!paymentResult || !paymentResult.success) {
       // 支付接口调用失败，标记订单为失败
       order.status = 'failed';
-      order.metadata.error = paymentResult.message;
+      order.metadata.error = paymentResult?.message || '创建支付失败';
       await order.save();
       
       return res.status(500).json({
         success: false,
         message: '创建支付订单失败',
-        error: paymentResult.message
+        error: paymentResult?.message || '未知错误'
       });
     }
     
@@ -265,15 +367,78 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
     // 获取支付二维码URL
     let paymentResult;
     
-    // 检查订单元数据中是否已经存储了二维码URL
-    if (order.metadata && order.metadata.codeUrl) {
+    // 首先尝试查询订单在支付平台的状态，避免重复创建
+    if (order.paymentMethod === 'wechat') {
+      try {
+        const statusResult = await queryOrderStatus(orderNumber);
+        
+        // 如果查询成功并且支付已完成
+        if (statusResult.success && statusResult.isPaid) {
+          // 更新订单为已支付
+          order.status = 'paid';
+          order.transactionId = statusResult.transactionId;
+          order.paymentTime = new Date();
+          await order.save();
+          
+          // 给用户添加积分
+          await addCredits(order.user, order.credits, `购买积分 - 订单号:${order.orderNumber}`);
+          
+          // 更新用户总消费金额
+          await User.findByIdAndUpdate(order.user, {
+            $inc: { totalSpent: order.amount }
+          });
+          
+          return res.json({
+            success: true,
+            order: {
+              orderNumber: order.orderNumber,
+              amount: order.amount,
+              credits: order.credits,
+              paymentMethod: order.paymentMethod,
+              status: 'paid',
+              paymentTime: order.paymentTime
+            },
+            payment: {
+              success: true,
+              isPaid: true,
+              message: '订单已支付完成'
+            }
+          });
+        }
+        
+        // 如果已经支付平台已创建但未支付
+        if (statusResult.success && statusResult.exists && !statusResult.isPaid) {
+          // 从平台获取支付URL
+          if (statusResult.codeUrl) {
+            // 保存到订单元数据中
+            order.metadata = order.metadata || {};
+            order.metadata.codeUrl = statusResult.codeUrl;
+            await order.save();
+            
+            paymentResult = {
+              success: true,
+              codeUrl: statusResult.codeUrl,
+              message: '获取已存在订单的支付码'
+            };
+          }
+        }
+      } catch (statusError) {
+        console.error('查询订单状态错误:', statusError);
+        // 查询失败不阻止后续流程
+      }
+    }
+    
+    // 如果没有获取到支付URL，则检查订单元数据
+    if (!paymentResult && order.metadata && order.metadata.codeUrl) {
       // 使用已存储的二维码URL
       paymentResult = {
         success: true,
         codeUrl: order.metadata.codeUrl
       };
-    } else {
-      // 没有存储二维码URL，生成新的支付二维码
+    }
+    
+    // 如果仍然没有支付URL，尝试创建新的支付
+    if (!paymentResult) {
       try {
         if (order.paymentMethod === 'wechat') {
           // 调用微信支付获取二维码
@@ -291,27 +456,51 @@ router.get('/order-info/:orderNumber', authenticate, async (req, res) => {
             await order.save();
           }
         } else if (order.paymentMethod === 'alipay') {
-          // 调用支付宝支付（这里需要再实现）
+          // 调用支付宝支付
           paymentResult = { success: false, message: '支付宝支付功能尚未实现' };
         }
       } catch (error) {
         console.error('生成支付二维码错误:', error);
-        paymentResult = { 
-          success: false, 
-          message: error.message || '生成支付二维码失败'
-        };
         
-        // 如果是商户订单号重复错误，则尝试查询订单状态
-        if (error.message && error.message.includes('201')) {
+        // 处理订单重复错误
+        if (error.message && (error.message.includes('201') || error.message.includes('订单号重复'))) {
           try {
-            const statusResult = await queryOrderStatus(orderNumber);
-            if (statusResult.success) {
-              // 返回查询到的状态
-              paymentResult.orderStatus = statusResult;
+            // 再次尝试查询订单状态
+            const retryStatus = await queryOrderStatus(orderNumber);
+            if (retryStatus.success && retryStatus.codeUrl) {
+              // 使用查询结果中的二维码URL
+              order.metadata = order.metadata || {};
+              order.metadata.codeUrl = retryStatus.codeUrl;
+              await order.save();
+              
+              paymentResult = {
+                success: true,
+                codeUrl: retryStatus.codeUrl,
+                message: '从现有订单获取支付码'
+              };
+            } else {
+              // 无法获取原始二维码，返回错误
+              paymentResult = { 
+                success: false, 
+                message: '订单号已存在，但无法获取支付二维码，请尝试创建新订单',
+                orderStatus: retryStatus
+              };
             }
-          } catch (statusError) {
-            console.error('查询重复订单状态错误:', statusError);
+          } catch (retryError) {
+            console.error('重试查询订单状态错误:', retryError);
+            paymentResult = { 
+              success: false, 
+              message: '订单号重复且无法查询状态，请尝试创建新订单',
+              error: error
+            };
           }
+        } else {
+          // 其他错误
+          paymentResult = { 
+            success: false, 
+            message: error.message || '生成支付二维码失败',
+            error: error
+          };
         }
       }
     }

@@ -542,12 +542,24 @@
             // 加载积分套餐
             async function loadPackages() {
                 try {
+                    // 显示加载状态
+                    document.getElementById('packageContainer').innerHTML = `
+                        <div class="col-12 text-center py-5">
+                            <div class="loading"></div>
+                            <p class="mt-2">加载套餐信息...</p>
+                        </div>
+                    `;
+                    
                     const response = await fetch('/api/payment/packages', {
                         method: 'GET',
                         headers: {
                             'Authorization': `Bearer ${getToken()}`
                         }
                     });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error ${response.status}`);
+                    }
                     
                     const data = await response.json();
                     
@@ -556,7 +568,7 @@
                     } else {
                         document.getElementById('packageContainer').innerHTML = `
                             <div class="col-12 text-center py-5">
-                                <p class="text-danger">加载套餐信息失败，请刷新页面重试</p>
+                                <p class="text-danger">加载套餐信息失败: ${data.message || '未知错误'}</p>
                             </div>
                         `;
                     }
@@ -564,7 +576,7 @@
                     console.error('加载套餐信息错误:', error);
                     document.getElementById('packageContainer').innerHTML = `
                         <div class="col-12 text-center py-5">
-                            <p class="text-danger">加载套餐信息失败，请刷新页面重试</p>
+                            <p class="text-danger">加载套餐信息失败: ${error.message || '未知错误'}</p>
                         </div>
                     `;
                 }
@@ -770,7 +782,7 @@
                     });
                     
                     if (!response.ok) {
-                        throw new Error(`HTTP error ${response.status}`);
+                        throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
                     }
                     
                     const data = await response.json();
@@ -819,14 +831,23 @@
                                     document.getElementById('expireMessage').textContent = '请尽快完成支付，订单即将过期';
                                 }
                             }
+                            
+                            // 显示检查结果
+                            document.getElementById('expireMessage').textContent = '订单状态: 等待支付中，请扫描二维码完成支付';
                         }
                     } else {
                         console.error('查询订单状态失败:', data.message);
-                        alert('查询订单状态失败: ' + data.message);
+                        document.getElementById('expireMessage').textContent = '查询订单状态失败: ' + (data.message || '未知错误');
                     }
                 } catch (error) {
                     console.error('查询订单状态错误:', error);
-                    alert('查询订单状态错误: ' + error.message);
+                    document.getElementById('expireMessage').textContent = '查询订单状态错误: ' + (error.message || '未知错误');
+                } finally {
+                    // 恢复按钮状态
+                    const checkBtn = document.getElementById('checkStatusBtn');
+                    if (!checkBtn.disabled) {
+                        checkBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 检查支付状态';
+                    }
                 }
             }
             
@@ -849,6 +870,10 @@
                         }
                     });
                     
+                    if (!response.ok) {
+                        throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+                    }
+                    
                     const data = await response.json();
                     
                     if (data.success) {
@@ -865,8 +890,12 @@
                         document.getElementById('checkStatusBtn').disabled = true;
                         document.getElementById('cancelOrderBtn').disabled = true;
                         
-                        // 显示成功消息
-                        alert('订单已成功取消');
+                        // 修改按钮为返回
+                        document.getElementById('cancelOrderBtn').innerHTML = '<i class="fas fa-arrow-left"></i> 返回选择';
+                        document.getElementById('cancelOrderBtn').disabled = false;
+                        document.getElementById('cancelOrderBtn').onclick = function() {
+                            window.location.href = '/credits.html';
+                        };
                     } else {
                         // 显示错误信息
                         alert('取消订单失败: ' + (data.message || '未知错误'));

@@ -320,11 +320,14 @@ export async function queryOrderStatus(orderNumber) {
         success: true,
         status: isPaid ? 'SUCCESS' : 'NOTPAY',
         isPaid: isPaid,
+        exists: true, // 表示订单在支付平台存在
         transactionId: isPaid ? `test_${Date.now()}` : '',
         orderNumber: orderNumber,
         amount: 0,
         timeEnd: isPaid ? new Date().toISOString().replace(/[-T:.Z]/g, '').substring(0, 14) : '',
-        isTestMode: true
+        isTestMode: true,
+        // 测试模式下提供虚拟二维码
+        codeUrl: 'weixin://wxpay/bizpayurl?pr=test_code_url'
       };
     }
     
@@ -370,22 +373,44 @@ export async function queryOrderStatus(orderNumber) {
       if (result.return_code === 'SUCCESS') {
         if (result.result_code === 'SUCCESS') {
           console.log('查询成功, 订单状态:', result.trade_state);
+          
+          // 对于已存在的订单，尝试获取二维码URL
+          let codeUrl = null;
+          
+          // 如果订单存在但未支付，我们可以通过其他接口获取二维码URL
+          if (result.trade_state === 'NOTPAY') {
+            try {
+              // 由于微信支付API限制，无法直接获取已有订单的二维码，
+              // 这里我们需要使用额外的方法处理，例如从订单附加数据中获取
+              // 或者可能需要考虑保存到数据库中
+              console.log('订单未支付，尝试获取支付二维码');
+            } catch (codeUrlError) {
+              console.error('获取已有订单二维码失败:', codeUrlError);
+            }
+          }
+          
           // 返回订单状态
           return {
             success: true,
             status: result.trade_state,
             isPaid: result.trade_state === 'SUCCESS',
-            transactionId: result.transaction_id,
+            exists: true, // 表示订单在支付平台存在
+            transactionId: result.transaction_id || '',
             orderNumber: result.out_trade_no,
-            amount: parseInt(result.total_fee) / 100, // 将分转为元
-            timeEnd: result.time_end
+            amount: parseInt(result.total_fee || '0') / 100, // 将分转为元
+            timeEnd: result.time_end || '',
+            codeUrl: codeUrl // 可能为空
           };
         } else {
+          // 对于 ORDERNOTEXIST 错误，我们标记订单不存在
+          const notExist = result.err_code === 'ORDERNOTEXIST';
+          
           console.error('查询返回业务失败:', result.err_code_des || '订单查询失败');
           return {
             success: false,
             message: result.err_code_des || '订单查询失败',
-            error: result
+            error: result,
+            exists: !notExist // 如果错误是订单不存在，则标记为不存在
           };
         }
       } else {
@@ -393,7 +418,8 @@ export async function queryOrderStatus(orderNumber) {
         return {
           success: false,
           message: result.return_msg || '通信失败',
-          error: result
+          error: result,
+          exists: false // 通信失败，无法确定是否存在
         };
       }
     } catch (httpError) {
@@ -406,7 +432,8 @@ export async function queryOrderStatus(orderNumber) {
       return {
         success: false,
         message: `HTTP请求失败: ${httpError.message}`,
-        error: httpError.toString()
+        error: httpError.toString(),
+        exists: false // 请求失败，无法确定是否存在
       };
     }
   } catch (error) {
@@ -415,7 +442,8 @@ export async function queryOrderStatus(orderNumber) {
     return {
       success: false,
       message: error.message || '查询订单失败',
-      error: error.toString()
+      error: error.toString(),
+      exists: false // 查询出错，无法确定是否存在
     };
   } finally {
     console.log('============= 结束查询订单状态 =============');
