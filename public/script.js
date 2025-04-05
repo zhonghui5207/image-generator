@@ -320,13 +320,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 更新比较容器的显示状态
     updateComparisonContainer();
     
-    // 重置生成按钮状态
-    if (typeof updateGenerateButtonState === 'function') {
-      updateGenerateButtonState();
-    }
-    
-    // 重置表单验证
-    checkFormValidity();
+    // 检查表单有效性，更新生成按钮状态
+    setTimeout(checkFormValidity, 100); // 添加小延迟确保DOM更新完成
   }
 
   // File input change
@@ -408,17 +403,29 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check if form is valid
   function checkFormValidity() {
     // 根据当前模式验证表单，不检查登录状态
-    if (currentMode === 'image-to-image' && !selectedFile) {
-      alert('请选择一个图片文件！');
-      return false;
+    let isValid = false;
+    
+    if (currentMode === 'image-to-image') {
+      // 图生图模式：需要图片和提示词
+      isValid = !!selectedFile && !!promptInput.value.trim();
+    } else {
+      // 文生图模式：只需要提示词
+      isValid = !!promptInput.value.trim();
     }
     
-    if (!promptInput.value.trim()) {
-      alert('请输入提示词！');
-      return false;
+    // 更新生成按钮状态
+    if (generateBtn) {
+      generateBtn.disabled = !isValid;
+      
+      // 添加颜色反馈，使按钮状态更明显
+      if (isValid) {
+        generateBtn.classList.add('active');
+      } else {
+        generateBtn.classList.remove('active');
+      }
     }
     
-    return true;
+    return isValid;
   }
 
   // Prompt input event
@@ -429,6 +436,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const file = e.target.files[0];
     if (file) {
       processFile(file);
+      // 文件选择后检查表单有效性
+      checkFormValidity();
     }
   }
 
@@ -437,6 +446,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const file = dt.files[0];
     if (file) {
       processFile(file);
+      // 拖放文件后检查表单有效性
+      checkFormValidity();
     }
   }
 
@@ -460,9 +471,9 @@ document.addEventListener('DOMContentLoaded', () => {
       previewImage.src = e.target.result;
       previewContainer.hidden = false;
       dropArea.querySelector('.upload-content').style.display = 'none';
-      // 确保在图片加载后检查表单有效性
-      setTimeout(checkFormValidity, 100); // 添加小延迟确保 DOM 更新
-      // console.log('Image loaded, checking form validity');
+      
+      // 确保在图片加载后重新检查表单有效性
+      setTimeout(checkFormValidity, 100); // 添加小延迟确保DOM更新完成
     };
     
     reader.readAsDataURL(file);
@@ -473,6 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
     dropArea.querySelector('.upload-content').style.display = 'flex';
     fileInput.value = '';
     selectedFile = null;
+    // 移除图片后检查表单有效性
     checkFormValidity();
   }
 
@@ -822,9 +834,14 @@ document.addEventListener('DOMContentLoaded', () => {
   async function handleSubmit(e) {
     e.preventDefault();
     
-    // 检查表单是否有效
-    if (!checkFormValidity()) {
-      console.log('表单验证失败');
+    // 验证表单
+    if (currentMode === 'image-to-image' && !selectedFile) {
+      alert('请选择一个图片文件！');
+      return;
+    }
+    
+    if (!promptInput.value.trim()) {
+      alert('请输入提示词！');
       return;
     }
     
@@ -1180,6 +1197,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (imageToImageTab && textToImageTab && imageToImageMode && textToImageMode) {
     switchMode('image-to-image');
     updateComparisonContainer();
+    
+    // 初始化时检查表单状态
+    checkFormValidity();
+    
     console.log('Mode initialization completed');
   } else {
     console.error('Cannot initialize modes: missing required elements');

@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchUserProfile();
     
     // 检查用户是否已绑定手机号，如果未绑定则禁用图像生成功能
-    if (!user.phoneVerified) {
+    if (user && !user.phoneVerified) {
       const generateBtn = document.getElementById('generate-btn');
       const uploadForm = document.getElementById('upload-form');
       const formElements = uploadForm ? uploadForm.querySelectorAll('input, button, textarea, select') : [];
