@@ -8,6 +8,7 @@ import { OpenAI } from 'openai';
 import https from 'https';
 import cookieParser from 'cookie-parser';
 import mongoose from './models/db.js';
+import ossClient, { uploadToOSS, uploadFromSourceToOSS, checkOssConfig } from './utils/ossClient.js';
 
 // 导入路由
 import authRoutes from './routes/authRoutes.js';
@@ -35,6 +36,10 @@ const port = process.env.PORT || 3000;
 // 添加中间件
 app.use(cookieParser()); // 解析cookie
 
+// 检查OSS配置
+const useOSS = checkOssConfig();
+console.log(`OSS存储状态: ${useOSS ? '已启用' : '未启用，将使用本地存储'}`);
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -49,8 +54,12 @@ const storage = multer.diskStorage({
   }
 });
 
+// 如果使用OSS，可以使用内存存储
+const memoryStorage = multer.memoryStorage();
+
+// 根据是否使用OSS选择存储方式
 const upload = multer({ 
-  storage: storage,
+  storage: useOSS ? memoryStorage : storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: function (req, file, cb) {
     const filetypes = /jpeg|jpg|png|gif|webp/;
@@ -63,6 +72,55 @@ const upload = multer({
     }
   }
 });
+
+// OSS文件处理中间件
+async function processFileWithOSS(req, res, next) {
+  if (!useOSS || !req.file) {
+    return next();
+  }
+  
+  try {
+    console.log(`处理文件上传到OSS: ${req.file.originalname}`);
+    
+    // 处理内存中的文件，上传到OSS
+    const uploadResult = await uploadToOSS(req.file, 'kdy-uploads/');
+    
+    // 保存OSS文件URL到请求对象中
+    req.file.originalPath = req.file.path; // 保存可能的本地路径
+    req.file.path = uploadResult.url; // 更新为OSS URL
+    req.file.ossPath = uploadResult.path; // 保存OSS路径
+    req.file.isOSS = true;
+    
+    next();
+  } catch (error) {
+    console.error('OSS处理文件失败:', error);
+    
+    // 如果OSS上传失败，但我们使用的是内存存储，需要保存到本地
+    if (req.file.buffer) {
+      const filename = Date.now() + path.extname(req.file.originalname);
+      const uploadDir = path.join(__dirname, 'uploads');
+      const filePath = path.join(uploadDir, filename);
+      
+      try {
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        
+        fs.writeFileSync(filePath, req.file.buffer);
+        req.file.path = filePath;
+        req.file.isOSS = false;
+        
+        console.log(`OSS上传失败，已保存到本地: ${filePath}`);
+        next();
+      } catch (fsError) {
+        console.error('保存文件到本地失败:', fsError);
+        return res.status(500).json({ error: '文件处理失败', details: fsError.message });
+      }
+    } else {
+      return res.status(500).json({ error: '文件上传到OSS失败', details: error.message });
+    }
+  }
+}
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -78,12 +136,211 @@ app.use('/api/payment', paymentRoutes);
 
 // Helper function to convert image to base64
 function image2Base64(imagePath) {
+  // 检查是否为URL（OSS路径）
+  if (imagePath.startsWith('http')) {
+    // 从URL获取图像内容
+    return new Promise(async (resolve, reject) => {
+      try {
+        const response = await fetch(imagePath);
+        const buffer = await response.arrayBuffer();
+        resolve(Buffer.from(buffer).toString('base64'));
+      } catch (error) {
+        console.error('从URL获取图像失败:', error);
+        reject(error);
+      }
+    });
+  }
+  
+  // 本地文件路径
   const image = fs.readFileSync(imagePath);
   return image.toString('base64');
 }
 
 // API endpoint for image generation
-app.post('/api/generate-image', authenticate, checkCredits, upload.single('image'), async (req, res) => {
+app.post('/api/generate-image', authenticate, checkCredits, upload.single('image'), processFileWithOSS, async (req, res) => {
+  // 设置错误处理函数以确保统一处理所有错误
+  const handleError = async (error, statusCode = 500, errorMessage = 'Error processing image') => {
+    console.error(`[${new Date().toISOString()}] Image generation error:`, error);
+    
+    // 检查是否请求流式响应
+    const useStream = req.query.stream === 'true';
+    
+    try {
+      // 生成失败时只扣除1积分
+      const failureCreditsToUse = 1;
+      
+      // 设置一个有效的生成图像URL，即使是占位符
+      const placeholderImage = originalImagePath || 'https://placehold.co/600x400?text=生成失败';
+      
+      // 保存失败记录
+      let failedImage;
+      let newCreditBalance;
+      
+      // 检查是否存在临时历史记录（流式响应中可能已创建）
+      if (typeof tempImageHistory !== 'undefined' && tempImageHistory) {
+        // 更新临时历史记录以反映错误
+        tempImageHistory.status = 'failed';
+        tempImageHistory.errorMessage = errorMessage;
+        tempImageHistory.generatedImage = placeholderImage;
+        tempImageHistory.creditsUsed = failureCreditsToUse;
+        
+        await tempImageHistory.save().catch(err => {
+          console.error('更新失败历史记录错误:', err);
+        });
+        
+        failedImage = tempImageHistory;
+      } else {
+        // 如果临时历史记录不存在，创建一个新的失败记录
+        const failedImageData = {
+          user: req.user._id,
+          generatedImage: placeholderImage,
+          prompt: prompt || '未知提示词',
+          model: selectedModel || process.env.OPENAI_MODEL || 'unknown',
+          creditsUsed: failureCreditsToUse,
+          mode: mode || 'unknown',
+          status: 'failed',
+          errorMessage: errorMessage
+        };
+        
+        // 如果是图生图模式且有原始图像，添加原始图像
+        if (mode === 'image-to-image' && originalImagePath) {
+          failedImageData.originalImage = originalImagePath;
+        }
+        
+        // 保存失败记录
+        failedImage = new GeneratedImage(failedImageData);
+        await failedImage.save().catch(err => {
+          console.error('保存失败历史记录错误:', err);
+        });
+      }
+      
+      // 扣除1积分
+      newCreditBalance = await useCredits(
+        req.user._id,
+        failureCreditsToUse,
+        `生成图像失败 (${selectedModel || 'unknown'}) - ${errorMessage}`,
+        failedImage?._id
+      ).catch(err => {
+        console.error('扣除积分错误:', err);
+        return req.user.credits - failureCreditsToUse; // 如果扣积分失败，估算新余额
+      });
+      
+      // 准备错误响应内容
+      const errorResponseContent = {
+        message: errorMessage,
+        details: error.message || 'Unknown error',
+        generationFailed: true,
+        requiredCredits: creditsToUse || 1,
+        currentCredits: req.user?.credits || 0,
+        creditsNeeded: Math.max(0, (creditsToUse || 1) - (req.user?.credits || 0)),
+        credits: {
+          used: failureCreditsToUse,
+          remaining: newCreditBalance
+        }
+      };
+      
+      // 检查headers是否已经发送
+      if (res.headersSent) {
+        console.warn('Headers already sent, cannot send full error response');
+        if (useStream && !res.finished) {
+          try {
+            // 尝试发送错误事件并结束流
+            res.write(`data: ${JSON.stringify({
+              type: 'error',
+              content: errorResponseContent
+            })}\n\n`);
+            res.end();
+          } catch (endError) {
+            console.error('Error ending stream:', endError);
+          }
+        }
+        return;
+      }
+      
+      // 根据响应类型返回错误
+      if (useStream) {
+        try {
+          // 设置流式响应的HTTP头
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+          });
+          
+          // 发送错误事件
+          res.write(`data: ${JSON.stringify({
+            type: 'error',
+            content: errorResponseContent
+          })}\n\n`);
+          
+          // 结束流
+          res.end();
+        } catch (streamError) {
+          console.error('Error sending stream error:', streamError);
+          // 如果流式响应失败，尝试发送普通JSON响应
+          if (!res.headersSent) {
+            res.status(statusCode).json({ 
+              error: errorMessage, 
+              details: error.message || 'Unknown error',
+              credits: errorResponseContent.credits,
+              generationFailed: true
+            });
+          }
+        }
+      } else {
+        // 普通JSON响应
+        res.status(statusCode).json({ 
+          error: errorMessage, 
+          details: error.message || 'Unknown error',
+          credits: errorResponseContent.credits,
+          generationFailed: true
+        });
+      }
+    } catch (creditError) {
+      console.error('处理API错误时积分处理失败:', creditError);
+      
+      // 只在尚未发送响应时发送错误响应
+      if (!res.headersSent) {
+        if (useStream) {
+          try {
+            // 设置流式响应的HTTP头
+            res.writeHead(200, {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive'
+            });
+            
+            // 发送错误事件
+            res.write(`data: ${JSON.stringify({
+              type: 'error',
+              content: {
+                message: `${errorMessage} (积分处理失败)`,
+                details: error.message || 'Unknown error',
+                generationFailed: true
+              }
+            })}\n\n`);
+            
+            // 结束流
+            res.end();
+          } catch (streamError) {
+            console.error('Error sending stream credit error:', streamError);
+            res.status(statusCode).json({ 
+              error: `${errorMessage} (积分处理失败)`, 
+              details: error.message || 'Unknown error',
+              generationFailed: true
+            });
+          }
+        } else {
+          res.status(statusCode).json({ 
+            error: `${errorMessage} (积分处理失败)`, 
+            details: error.message || 'Unknown error',
+            generationFailed: true
+          });
+        }
+      }
+    }
+  };
+  
   try {
     // 获取生成模式
     const mode = req.body.mode || 'image-to-image';
@@ -102,8 +359,14 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
     if (mode === 'image-to-image' && req.file) {
       imagePath = req.file.path;
       imageType = path.extname(req.file.originalname).substring(1);
-      // 将原始图像保存到公共目录
-      originalImagePath = `/uploads/${path.basename(imagePath)}`;
+      
+      // 将原始图像路径保存（OSS URL或本地路径）
+      originalImagePath = req.file.isOSS 
+        ? imagePath // 如果是OSS，直接使用URL
+        : `/uploads/${path.basename(imagePath)}`; // 本地文件，转换为相对路径
+      
+      console.log(`使用${req.file.isOSS ? 'OSS' : '本地'}图片路径:`, imagePath);
+      console.log(`原始图像路径:`, originalImagePath);
     }
     
     // 获取所选模型，如果没有指定则使用环境变量中的默认值
@@ -225,7 +488,9 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
                 {
                   type: "image_url",
                   image_url: {
-                    url: `data:image/${imageType};base64,${image2Base64(imagePath)}`
+                    url: imagePath.startsWith('http') 
+                      ? `data:image/${imageType};base64,${await image2Base64(imagePath)}`
+                      : `data:image/${imageType};base64,${image2Base64(imagePath)}`
                   }
                 },
                 {
@@ -311,6 +576,16 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
             console.log('未找到图像 URL，使用原始图像作为占位');
             generatedImageUrl = originalImagePath || 'https://placehold.co/600x400?text=生成失败';
             isGenerationFailed = true; // 标记为生成失败
+          } else if (useOSS && generatedImageUrl && generatedImageUrl.startsWith('http')) {
+            // 如果启用了OSS且找到了图像URL，将其上传到OSS
+            try {
+              console.log('将生成的图像从URL上传到OSS:', generatedImageUrl);
+              const ossUploadResult = await uploadFromSourceToOSS(generatedImageUrl, 'kdy-generated/');
+              generatedImageUrl = ossUploadResult.url;
+              console.log('图像已上传到OSS:', generatedImageUrl);
+            } catch (ossError) {
+              console.error('上传生成图像到OSS失败，使用原始URL:', ossError);
+            }
           }
           
           // 扣除用户积分 - 根据生成结果调整积分消耗
@@ -370,137 +645,9 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           res.end();
           return;
         } catch (apiError) {
-          // 流式响应时的API错误处理
-          console.error('流式响应API错误:');
-          console.error('Error name:', apiError.name);
-          console.error('Error message:', apiError.message);
-          console.error('Error stack:', apiError.stack);
-          
-          let errorMessage = 'OpenAI API Error';
-          
-          // 分析错误类型并提供更有用的错误信息
-          if (apiError.message.includes('Connection error')) {
-            errorMessage = '无法连接到 OpenAI API。请检查您的网络连接和 API 配置。';
-          } else if (apiError.message.includes('timeout')) {
-            errorMessage = '请求超时。OpenAI API 响应时间过长。';
-          } else if (apiError.message.includes('401')) {
-            errorMessage = 'API 密钥无效。请检查您的 OpenAI API 密钥。';
-          } else if (apiError.message.includes('429')) {
-            errorMessage = '请求频率超限。请稍后再试。';
-          } else if (apiError.message.includes('Premature close')) {
-            errorMessage = '连接过早关闭。这可能是由于网络问题或代理设置导致的。';
-          }
-          
-          try {
-            // 生成失败时只扣除1积分
-            const failureCreditsToUse = 1;
-            
-            // 设置一个有效的生成图像URL，即使是占位符
-            const placeholderImage = originalImagePath || 'https://placehold.co/600x400?text=生成失败';
-            
-            // 更新临时历史记录以反映错误
-            if (tempImageHistory) {
-              tempImageHistory.status = 'failed';
-              tempImageHistory.errorMessage = errorMessage;
-              tempImageHistory.generatedImage = placeholderImage;
-              tempImageHistory.creditsUsed = failureCreditsToUse;
-              
-              await tempImageHistory.save().catch(err => {
-                console.error('更新失败历史记录错误:', err);
-              });
-              
-              // 扣除1积分
-              const newCreditBalance = await useCredits(
-                req.user._id,
-                failureCreditsToUse,
-                `生成图像失败 (${selectedModel}) - ${errorMessage}`,
-                tempImageHistory._id
-              ).catch(err => {
-                console.error('扣除积分错误:', err);
-                return req.user.credits - failureCreditsToUse; // 如果扣积分失败，估算新余额
-              });
-              
-              // 对于流式响应，发送错误信息数据块
-              res.write(`data: ${JSON.stringify({
-                type: 'error',
-                content: {
-                  message: errorMessage,
-                  details: apiError.message,
-                  generationFailed: true,
-                  requiredCredits: creditsToUse,
-                  currentCredits: req.user.credits,
-                  creditsNeeded: Math.max(0, creditsToUse - req.user.credits)
-                }
-              })}\n\n`);
-            } else {
-              // 如果临时历史记录不存在，创建一个新的失败记录
-              const failedImageData = {
-                user: req.user._id,
-                generatedImage: placeholderImage,
-                prompt: prompt,
-                model: selectedModel,
-                creditsUsed: failureCreditsToUse,
-                mode: mode,
-                status: 'failed',
-                errorMessage: errorMessage
-              };
-              
-              // 如果是图生图模式且有原始图像，添加原始图像
-              if (mode === 'image-to-image' && originalImagePath) {
-                failedImageData.originalImage = originalImagePath;
-              }
-              
-              // 保存失败记录
-              const failedImage = new GeneratedImage(failedImageData);
-              await failedImage.save().catch(err => {
-                console.error('保存失败历史记录错误:', err);
-              });
-              
-              // 扣除1积分
-              const newCreditBalance = await useCredits(
-                req.user._id,
-                failureCreditsToUse,
-                `生成图像失败 (${selectedModel}) - ${errorMessage}`,
-                failedImage._id
-              ).catch(err => {
-                console.error('扣除积分错误:', err);
-                return req.user.credits - failureCreditsToUse; // 如果扣积分失败，估算新余额
-              });
-              
-              // 对于流式响应，发送错误信息数据块
-              res.write(`data: ${JSON.stringify({
-                type: 'error',
-                content: {
-                  message: errorMessage,
-                  details: apiError.message,
-                  generationFailed: true,
-                  requiredCredits: creditsToUse,
-                  currentCredits: req.user.credits,
-                  creditsNeeded: Math.max(0, creditsToUse - req.user.credits)
-                }
-              })}\n\n`);
-            }
-            
-            // 结束流式响应
-            res.end();
-            return;
-          } catch (creditError) {
-            console.error('处理流式API错误时积分处理失败:', creditError);
-            
-            // 发送错误数据块
-            res.write(`data: ${JSON.stringify({
-              type: 'error',
-              content: {
-                message: errorMessage + ' (积分处理失败)',
-                details: apiError.message,
-                generationFailed: true
-              }
-            })}\n\n`);
-            
-            // 结束流式响应
-            res.end();
-            return;
-          }
+          // 使用统一的错误处理函数
+          await handleError(apiError, 500, '流式响应API错误');
+          return;
         }
       } else {
         // 非流式响应处理（原有方式）
@@ -508,7 +655,7 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         
         if (mode === 'image-to-image') {
           // 图生图模式：包含图片和提示词
-          const imageBase64 = image2Base64(imagePath);
+          const imageBase64 = await image2Base64(imagePath);
           
           messages = [{
             role: 'user', 
@@ -516,7 +663,9 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
               {
                 type: "image_url",
                 image_url: {
-                  url: `data:image/${imageType};base64,${imageBase64}`
+                  url: imagePath.startsWith('http') 
+                    ? `data:image/${imageType};base64,${imageBase64}`
+                    : `data:image/${imageType};base64,${imageBase64}`
                 }
               },
               {
@@ -593,11 +742,21 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           console.log('未找到图像 URL，使用原始图像作为占位');
           generatedImageUrl = originalImagePath;
           isGenerationFailed = true; // 标记为生成失败
+        } else if (useOSS && generatedImageUrl && generatedImageUrl.startsWith('http')) {
+          // 如果启用了OSS且找到了图像URL，将其上传到OSS
+          try {
+            console.log('将生成的图像从URL上传到OSS:', generatedImageUrl);
+            const ossUploadResult = await uploadFromSourceToOSS(generatedImageUrl, 'kdy-generated/');
+            generatedImageUrl = ossUploadResult.url;
+            console.log('图像已上传到OSS:', generatedImageUrl);
+          } catch (ossError) {
+            console.error('上传生成图像到OSS失败，使用原始URL:', ossError);
+          }
         }
         
         // 保存生成历史记录
         const generatedImageData = {
-          user: req.user._id, // 修正：使用user字段而不是userId，与模型定义一致,
+          user: req.user._id,
           generatedImage: generatedImageUrl,
           prompt: prompt,
           model: selectedModel,
@@ -675,85 +834,32 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
         console.error('请检查您的网络连接和代理设置');
       }
       
-      try {
-        // API错误时，也保存一条失败的生成记录
-        if (!res.headersSent) {
-          // 生成失败时只扣除1积分
-          const failureCreditsToUse = 1;
-          
-          // 设置一个有效的生成图像URL，即使是占位符
-          const placeholderImage = originalImagePath || 'https://placehold.co/600x400?text=生成失败';
-          
-          // 保存失败的生成历史记录
-          const failedImageData = {
-            user: req.user._id,
-            generatedImage: placeholderImage, // 使用占位图像或原始图像，而不是空字符串
-            prompt: prompt,
-            model: selectedModel,
-            creditsUsed: failureCreditsToUse,
-            mode: mode,
-            status: 'failed',
-            errorMessage: errorMessage
-          };
-          
-          // 如果是图生图模式且有原始图像，添加原始图像
-          if (mode === 'image-to-image' && originalImagePath) {
-            failedImageData.originalImage = originalImagePath;
-          }
-          
-          // 保存失败记录
-          const failedImage = new GeneratedImage(failedImageData);
-          await failedImage.save().catch(err => {
-            console.error('保存失败历史记录错误:', err);
-          });
-          
-          // 扣除1积分
-          const newCreditBalance = await useCredits(
-            req.user._id,
-            failureCreditsToUse,
-            `生成图像失败 (${selectedModel}) - ${errorMessage}`,
-            failedImage._id
-          ).catch(err => {
-            console.error('扣除积分错误:', err);
-            return req.user.credits - failureCreditsToUse; // 如果扣积分失败，估算新余额
-          });
-          
-          res.status(statusCode).json({ 
-            error: errorMessage,
-            details: apiError.message,
-            apiResponse: apiError.response?.data || null,
-            generationFailed: true,
-            credits: {
-              used: failureCreditsToUse,
-              remaining: newCreditBalance
-            }
-          });
-        }
-      } catch (creditError) {
-        console.error('处理API错误时积分处理失败:', creditError);
-        
-        // 只在尚未发送响应时发送错误响应
-        if (!res.headersSent) {
-          res.status(statusCode).json({ 
-            error: errorMessage, 
-            details: apiError.message,
-            apiResponse: apiError.response?.data || null,
-            generationFailed: true
-          });
-        }
-      }
+      // 使用统一的错误处理函数
+      await handleError(apiError, statusCode, errorMessage);
     }
     
   } catch (error) {
-    console.error('Error processing image:', error);
-    // 只在尚未发送响应时发送错误响应
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Error processing image', details: error.message });
-    }
+    await handleError(error, 500, 'Error processing image');
   }
 });
 
 // Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
+  
+  // 检查OSS配置并打印状态
+  console.log('----------------------------------------');
+  console.log('系统配置状态:');
+  console.log(`- OSS存储: ${useOSS ? '已启用' : '未启用，使用本地存储'}`);
+  if (useOSS) {
+    console.log(`- OSS区域: ${process.env.OSS_REGION}`);
+    console.log(`- OSS存储桶: ${process.env.OSS_BUCKET}`);
+    console.log(`- OSS访问URL: ${process.env.OSS_BUCKET_URL}`);
+    console.log(`- OSS上传文件夹: kdy-uploads/`);
+    console.log(`- OSS生成图片文件夹: kdy-generated/`);
+  } else {
+    console.log('- 如需启用OSS存储，请在.env文件中配置OSS相关参数');
+  }
+  console.log(`- 本地上传目录: ${path.join(__dirname, 'uploads')}`);
+  console.log('----------------------------------------');
 });

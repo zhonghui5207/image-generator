@@ -624,19 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 处理流式响应
   async function handleStreamResponse(formData) {
-    // 根据当前模式更新比较容器
-    updateComparisonContainer();
     try {
-      // 创建进度对象
-      const progress = simulateProgress();
-      progress.start();
-      
-      // 展示加载界面
-      const timeEstimateElement = document.createElement('div');
-      timeEstimateElement.id = 'time-estimate';
-      timeEstimateElement.className = 'time-estimate';
-      loadingIndicator.appendChild(timeEstimateElement);
-      
       updateProgress(10, '建立流式连接...', 60);
       
       // 创建 EventSource 对象连接服务器发送的事件流
@@ -650,8 +638,25 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || '上传文件失败');
+        // 尝试解析错误响应
+        try {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.error || errorData.message || '上传文件失败');
+        } catch (parseError) {
+          // 如果JSON解析失败，可能是服务器返回了HTML错误页面
+          console.error('解析错误响应失败:', parseError);
+          
+          // 尝试获取响应的文本内容
+          const errorText = await uploadResponse.text();
+          
+          // 检查是否为HTML内容（通常表示服务器错误）
+          if (errorText.includes('<!DOCTYPE') || errorText.includes('<html')) {
+            console.error('服务器返回了HTML错误页面:', errorText.substring(0, 200));
+            throw new Error(`服务器错误 (状态码: ${uploadResponse.status}). 请稍后再试或联系管理员.`);
+          } else {
+            throw new Error(`上传文件失败 (状态码: ${uploadResponse.status}): ${errorText.substring(0, 100)}`);
+          }
+        }
       }
       
       // 获取原始提示词
@@ -672,236 +677,185 @@ document.addEventListener('DOMContentLoaded', () => {
       updateProgress(40, '接收数据中...', 60);
       
       // 处理数据流
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        // 解码数据
-        const text = decoder.decode(value);
-        const lines = text.split('\n\n');
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.substring(6));
-              
-              // 根据数据类型处理
-              if (data.type === 'info') {
-                // 初始信息
-                if (data.content.originalImage) {
-                  originalImagePath = data.content.originalImage;
-                  originalImage.src = originalImagePath;
-                }
-                updateProgress(50, '正在生成图像...', 60);
-              } else if (data.type === 'content') {
-                // 内容块
-                const content = data.content;
-                if (content) {
-                  // 添加到完整内容
-                  fullContent += content;
-                  
-                  // 尝试提取进度信息 - 改进提取方法
-                  const progressMatch = content.match(/>进度\s*\*\*(\d+)%\*\*/i);
-                  if (progressMatch && progressMatch[1]) {
-                    const progressValue = parseInt(progressMatch[1], 10);
-                    if (!isNaN(progressValue)) {
-                      // 使用防抖函数更新进度，避免频繁更新导致的跳跃
-                      if (progressValue > 10) { // 只处理有意义的进度值
-                        debouncedProgressUpdate(progress, progressValue);
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          // 解码数据
+          const text = decoder.decode(value);
+          const lines = text.split('\n\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.substring(6));
+                
+                // 根据数据类型处理
+                if (data.type === 'info') {
+                  // 初始信息
+                  if (data.content.originalImage) {
+                    originalImagePath = data.content.originalImage;
+                    originalImage.src = originalImagePath;
+                  }
+                  updateProgress(50, '正在生成图像...', 60);
+                } else if (data.type === 'content') {
+                  // 内容块
+                  const content = data.content;
+                  if (content) {
+                    // 添加到完整内容
+                    fullContent += content;
+                    
+                    // 尝试提取进度信息 - 改进提取方法
+                    const progressMatch = content.match(/>进度\s*\*\*(\d+)%\*\*/i);
+                    if (progressMatch && progressMatch[1]) {
+                      const progressValue = parseInt(progressMatch[1], 10);
+                      if (!isNaN(progressValue)) {
+                        // 使用防抖函数更新进度，避免频繁更新导致的跳跃
+                        if (progressValue > 10) { // 只处理有意义的进度值
+                          debouncedProgressUpdate(progress, progressValue);
+                        }
                       }
                     }
                   }
-                }
-              } else if (data.type === 'error') {
-                // 错误信息
-                console.error('收到错误信息:', data.content);
-                
-                // 如果是积分不足错误，显示特定提示
-                if (data.content.message && data.content.message.includes('积分不足')) {
-                  const requiredCredits = data.content.requiredCredits || 1;
-                  const currentCredits = data.content.currentCredits || 0;
-                  const creditsNeeded = data.content.creditsNeeded || (requiredCredits - currentCredits);
+                } else if (data.type === 'error') {
+                  // 错误信息
+                  console.error('收到错误信息:', data.content);
                   
-                  showError(`积分不足！需要 ${requiredCredits} 积分，您当前只有 ${currentCredits} 积分。还需要 ${creditsNeeded} 积分。请前往个人中心充值。`);
-                } else {
-                  // 其他错误
-                  showError(data.content.message || '生成图像时出现错误');
-                }
-                
-                // 重置进度条和加载状态
-                progress.reset();
-                
-                // 立即隐藏加载指示器，不要延迟
-                loadingIndicator.style.display = 'none';
-                
-                // 重置表单状态，让用户可以重试
-                uploadForm.parentElement.hidden = false;
-                resultContainer.hidden = true;
-                
-                // 终止处理，提前返回
-                return;
-              } else if (data.type === 'result') {
-                // 最终结果
-                generatedImageUrl = data.content.generatedImageUrl;
-                console.log('收到生成的图像 URL:', generatedImageUrl);
-                console.log('完整的响应数据:', JSON.stringify(data.content));
-                
-                // 检查图像 URL是否有效
-                if (!generatedImageUrl || generatedImageUrl === 'null' || generatedImageUrl === 'undefined') {
-                  console.warn('服务器返回的图像 URL无效:', generatedImageUrl);
-                  // 尝试从完整响应中提取图像 URL
-                  if (data.content.historyId) {
-                    console.log('尝试使用历史ID构造图像 URL:', data.content.historyId);
-                    // 使用历史ID构造一个图像 URL
-                    generatedImageUrl = `/api/history/image/${data.content.historyId}`;
-                  }
-                }
-                
-                // 提取API返回的提示词和用户输入的提示词
-                const apiPrompt = data.content.apiPrompt;
-                const userPrompt = data.content.userPrompt || originalPrompt;
-                
-                console.log('API返回的提示词:', apiPrompt);
-                console.log('用户输入的提示词:', userPrompt);
-                
-                // 立即将图像 URL 设置到图像元素
-                if (generatedImageUrl && generatedImage) {
-                  generatedImage.src = generatedImageUrl;
-                  if (downloadImageBtn) {
-                    downloadImageBtn.href = generatedImageUrl;
-                    downloadImageBtn.download = 'generated-image.jpg';
+                  // 如果是积分不足错误，显示特定提示
+                  if (data.content.message && data.content.message.includes('积分不足')) {
+                    const requiredCredits = data.content.requiredCredits || 1;
+                    const currentCredits = data.content.currentCredits || 0;
+                    const creditsNeeded = data.content.creditsNeeded || (requiredCredits - currentCredits);
+                    
+                    showError(`积分不足！需要 ${requiredCredits} 积分，您当前只有 ${currentCredits} 积分。还需要 ${creditsNeeded} 积分。请前往个人中心充值。`);
+                  } else {
+                    // 其他错误
+                    showError(data.content.message || '生成图像时出现错误');
                   }
                   
-                  // 显示图像容器
-                  if (generatedImageContainer) {
-                    generatedImageContainer.style.display = 'block';
+                  // 重置进度条和加载状态
+                  progress.reset();
+                  
+                  // 立即隐藏加载指示器，不要延迟
+                  loadingIndicator.style.display = 'none';
+                  
+                  // 重置表单状态，让用户可以重试
+                  uploadForm.parentElement.hidden = false;
+                  resultContainer.hidden = true;
+                  
+                  // 更新用户积分（如果错误响应中包含积分信息）
+                  if (data.content.credits) {
+                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    user.credits = data.content.credits.remaining;
+                    localStorage.setItem('user', JSON.stringify(user));
+                    
+                    // 更新页面上的积分显示
+                    const creditsAmount = document.getElementById('credits-amount');
+                    if (creditsAmount) {
+                      creditsAmount.textContent = data.content.credits.remaining;
+                    }
                   }
                   
-                  // 设置下载和预览功能
-                  setupImageDownload(generatedImageUrl);
-                }
-                
-                // 显示提示词信息 - 使用API返回的提示词
-                displayPromptInfo(apiPrompt, userPrompt);
-                
-                // 更新用户积分
-                if (data.content.credits) {
-                  const user = JSON.parse(localStorage.getItem('user') || '{}');
-                  user.credits = data.content.credits.remaining;
-                  localStorage.setItem('user', JSON.stringify(user));
+                  // 终止处理，提前返回
+                  return;
+                } else if (data.type === 'result') {
+                  // 最终结果
+                  generatedImageUrl = data.content.generatedImageUrl;
+                  console.log('收到生成的图像 URL:', generatedImageUrl);
+                  console.log('完整的响应数据:', JSON.stringify(data.content));
                   
-                  // 更新页面上的积分显示
-                  const creditsAmount = document.getElementById('credits-amount');
-                  if (creditsAmount) {
-                    creditsAmount.textContent = data.content.credits.remaining;
+                  // 检查图像 URL是否有效
+                  if (!generatedImageUrl || generatedImageUrl === 'null' || generatedImageUrl === 'undefined') {
+                    console.warn('服务器返回的图像 URL无效:', generatedImageUrl);
+                    // 尝试从完整响应中提取图像 URL
+                    if (data.content.historyId) {
+                      console.log('尝试使用历史ID构造图像 URL:', data.content.historyId);
+                      // 使用历史ID构造一个图像 URL
+                      generatedImageUrl = `/api/history/image/${data.content.historyId}`;
+                    }
                   }
+                  
+                  // 提取API返回的提示词和用户输入的提示词
+                  const apiPrompt = data.content.apiPrompt;
+                  const userPrompt = data.content.userPrompt || originalPrompt;
+                  
+                  console.log('API返回的提示词:', apiPrompt);
+                  console.log('用户输入的提示词:', userPrompt);
+                  
+                  // 立即将图像 URL 设置到图像元素
+                  if (generatedImageUrl && generatedImage) {
+                    generatedImage.src = generatedImageUrl;
+                    if (downloadImageBtn) {
+                      downloadImageBtn.href = generatedImageUrl;
+                      downloadImageBtn.download = 'generated-image.jpg';
+                    }
+                    
+                    // 显示图像容器
+                    if (generatedImageContainer) {
+                      generatedImageContainer.style.display = 'block';
+                    }
+                    
+                    // 设置下载和预览功能
+                    setupImageDownload(generatedImageUrl);
+                  }
+                  
+                  // 显示提示词信息 - 使用API返回的提示词
+                  displayPromptInfo(apiPrompt, userPrompt);
+                  
+                  // 更新用户积分
+                  if (data.content.credits) {
+                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    user.credits = data.content.credits.remaining;
+                    localStorage.setItem('user', JSON.stringify(user));
+                    
+                    // 更新页面上的积分显示
+                    const creditsAmount = document.getElementById('credits-amount');
+                    if (creditsAmount) {
+                      creditsAmount.textContent = data.content.credits.remaining;
+                    }
+                  }
+                  
+                  updateProgress(90, '处理生成的图像...', 60);
                 }
-                
-                updateProgress(90, '处理生成的图像...', 60);
+              } catch (e) {
+                console.error('解析数据错误:', e, '原始数据:', line.substring(6));
+                // 即使解析失败也继续处理其他数据
               }
-            } catch (e) {
-              console.error('解析数据错误:', e);
             }
           }
         }
+        
+        // 如果流式响应结束但没有收到结果，显示错误
+        if (!generatedImageUrl) {
+          console.error('流式响应结束但未收到有效结果');
+          showError('图像生成过程异常结束，请稍后重试');
+          
+          // 重置状态
+          progress.reset();
+          loadingIndicator.style.display = 'none';
+          uploadForm.parentElement.hidden = false;
+          resultContainer.hidden = true;
+        }
+      } catch (streamError) {
+        console.error('流式处理错误:', streamError);
+        showError('图像生成过程中断，请稍后重试');
+        
+        // 重置状态
+        progress.reset();
+        loadingIndicator.style.display = 'none';
+        uploadForm.parentElement.hidden = false;
+        resultContainer.hidden = true;
       }
-      
-      // 处理生成的图像 - 在流式响应结束后再次确认图像已经显示
-      if (generatedImageUrl) {
-        console.log('流式响应结束，确认图像 URL:', generatedImageUrl);
-        
-        // 再次确认图像元素已设置
-        if (generatedImage && (!generatedImage.src || generatedImage.src === '#' || generatedImage.src === 'about:blank')) {
-          generatedImage.src = generatedImageUrl;
-        }
-        
-        if (downloadImageBtn) {
-          downloadImageBtn.href = generatedImageUrl;
-          downloadImageBtn.download = 'generated-image.jpg';
-        }
-        
-        // 设置下载和预览功能
-        setupImageDownload(generatedImageUrl);
-        
-        // 确保图像容器可见
-        if (generatedImageContainer) {
-          generatedImageContainer.style.display = 'block';
-        }
-        
-        // 不需要再次显示提示词信息，因为已经在result事件中处理了
-      } else {
-        // 如果没有图像 URL
-        console.log('流式响应结束，但没有收到图像 URL');
-        
-        // 尝试生成一个占位图像 URL
-        // 我们将使用一个静态的占位图像，这样用户至少可以看到一些内容
-        const placeholderImageUrl = 'https://placehold.co/600x400/lightblue/white?text=图像生成中';
-        console.log('使用占位图像:', placeholderImageUrl);
-        
-        // 尝试使用原始图像作为占位，如果有的话
-        if (originalImagePath && originalImage && originalImage.src) {
-          generatedImageUrl = originalImage.src;
-          console.log('使用原始图像作为占位:', generatedImageUrl);
-        } else {
-          // 如果没有原始图像，使用占位图像
-          generatedImageUrl = placeholderImageUrl;
-        }
-        
-        // 设置图像和下载按钮
-        if (generatedImage) {
-          generatedImage.src = generatedImageUrl;
-        }
-        
-        if (downloadImageBtn) {
-          downloadImageBtn.href = generatedImageUrl;
-          downloadImageBtn.download = 'generated-image.jpg';
-        }
-        
-        if (generatedImageContainer) {
-          generatedImageContainer.style.display = 'block';
-        }
-        
-        // 设置下载和预览功能
-        setupImageDownload(generatedImageUrl);
-        
-        // 显示提示信息
-        if (resultContent) {
-          resultContent.style.display = 'block';
-          resultContent.innerHTML = '生成请求已发送，但服务器没有返回图像。请稍后在历史记录中查看结果。';
-        }
-      }
-      
-      // 完成进度
-      progress.complete();
-      
-      // 显示结果容器
-      if (uploadForm && uploadForm.parentElement) {
-        uploadForm.parentElement.hidden = true;
-      }
-      if (resultContainer) {
-        resultContainer.hidden = false;
-      }
-      
-      // 添加调试信息
-      console.log('流式响应完成，结果容器显示状态:', !resultContainer.hidden);
-      console.log('图像容器显示状态:', generatedImageContainer.style.display);
-      console.log('图像 URL:', generatedImage.src);
-      
     } catch (error) {
-      console.error('流式响应错误:', error);
-      showError(error.message || '处理流式响应时出错');
+      console.error('流式请求错误:', error);
+      showError(error.message || '无法建立流式连接，请稍后重试');
       
-      // 重置进度条
-      progress.reset();
-      
-      // 重置表单状态，让用户可以重试
+      // 重置状态
+      progress?.reset();
+      loadingIndicator.style.display = 'none';
       uploadForm.parentElement.hidden = false;
       resultContainer.hidden = true;
-    } finally {
-      // 确保无论如何都会隐藏加载指示器
-      setTimeout(() => {
-        loadingIndicator.style.display = 'none';
-      }, 1000);
     }
   }
   
