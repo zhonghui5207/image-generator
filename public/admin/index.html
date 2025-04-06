@@ -219,18 +219,19 @@
         try {
           const response = await adminUtils.apiRequest('/api/admin/dashboard');
           
-          if (response && response.success) {
+          if (response && response.success && response.stats) {
             // 更新统计数据
             totalUsersElement.textContent = response.stats.totalUsers || 0;
             totalImagesElement.textContent = response.stats.totalImages || 0;
             
             // 加载订单统计
             const orderStatsResponse = await adminUtils.apiRequest('/api/admin/orders/stats');
-            if (orderStatsResponse && orderStatsResponse.success) {
+            if (orderStatsResponse && orderStatsResponse.success && orderStatsResponse.stats) {
               todayOrdersElement.textContent = orderStatsResponse.stats.todayCount || 0;
               todayRevenueElement.textContent = adminUtils.formatCurrency(orderStatsResponse.stats.todayRevenue || 0);
             }
           } else {
+            console.error('加载统计数据失败:', response);
             adminUtils.showNotification('加载统计数据失败', 'error');
           }
         } catch (error) {
@@ -245,12 +246,12 @@
           // 只获取最近5个用户
           const response = await adminUtils.apiRequest('/api/admin/users?limit=5&page=1');
           
-          if (response && response.success) {
+          if (response && response.success && response.users) {
             // 清空表格
             recentUsersTableBody.innerHTML = '';
             
             // 如果没有数据
-            if (response.users.length === 0) {
+            if (!response.users.length) {
               recentUsersTableBody.innerHTML = '<tr><td colspan="4" class="empty-table-message">暂无用户数据</td></tr>';
               return;
             }
@@ -261,7 +262,7 @@
               
               // 用户名
               const usernameCell = document.createElement('td');
-              usernameCell.textContent = user.username;
+              usernameCell.textContent = user.username || '';
               row.appendChild(usernameCell);
               
               // 邮箱
@@ -299,12 +300,12 @@
           // 只获取最近5个订单
           const response = await adminUtils.apiRequest('/api/admin/orders?limit=5&page=1');
           
-          if (response && response.success) {
+          if (response && response.success && response.orders) {
             // 清空表格
             recentOrdersTableBody.innerHTML = '';
             
             // 如果没有数据
-            if (response.orders.length === 0) {
+            if (!response.orders.length) {
               recentOrdersTableBody.innerHTML = '<tr><td colspan="4" class="empty-table-message">暂无订单数据</td></tr>';
               return;
             }
@@ -315,17 +316,17 @@
               
               // 订单号
               const orderNumberCell = document.createElement('td');
-              orderNumberCell.textContent = order.orderNumber;
+              orderNumberCell.textContent = order.orderNumber || order._id || '';
               row.appendChild(orderNumberCell);
               
               // 用户
               const userCell = document.createElement('td');
-              userCell.textContent = order.user ? order.user.username : '未知用户';
+              userCell.textContent = order.user ? (order.user.username || '') : '未知用户';
               row.appendChild(userCell);
               
               // 金额
               const amountCell = document.createElement('td');
-              amountCell.textContent = adminUtils.formatCurrency(order.amount);
+              amountCell.textContent = adminUtils.formatCurrency(order.amount || 0);
               row.appendChild(amountCell);
               
               // 状态
@@ -352,7 +353,7 @@
                   break;
                 default:
                   statusClass = 'status-default';
-                  statusText = order.status;
+                  statusText = order.status || '未知状态';
               }
               
               statusCell.innerHTML = `<span class="status-badge ${statusClass}">${statusText}</span>`;

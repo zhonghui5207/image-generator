@@ -25,25 +25,23 @@ const adminUtils = {
       usernameElement.textContent = adminUsername;
     }
     
-    // 检查自定义的管理员token
-    if (token.startsWith('admin_token_')) {
-      // 验证通过，这是我们自定义的管理员token
-      return true;
-    }
-    
-    // 如果不是自定义token，则检查JWT格式的令牌是否过期
+    // JWT令牌格式检查
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminUsername');
-        window.location.href = '/admin/login.html';
-        return false;
+      if (token.includes('.')) {
+        // 看起来是JWT格式的令牌，检查是否过期
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUsername');
+          window.location.href = 'login.html';
+          return false;
+        }
       }
     } catch (e) {
+      console.error('令牌验证错误:', e);
       localStorage.removeItem('adminToken');
       localStorage.removeItem('adminUsername');
-      window.location.href = '/admin/login.html';
+      window.location.href = 'login.html';
       return false;
     }
     
@@ -197,25 +195,7 @@ const adminUtils = {
       // 从localStorage获取token
       const token = localStorage.getItem('adminToken');
       
-      // 检查是否是自定义管理员token
-      if (token && token.startsWith('admin_token_')) {
-        // 如果是自定义token，模拟请求和响应
-        console.log(`使用自定义管理员token请求 ${url}`);
-        
-        // 根据请求URL返回模拟数据
-        if (url.includes('/dashboard')) {
-          return this.getMockDashboardData(url);
-        } else if (url.includes('/orders')) {
-          return this.getMockOrdersData(url);
-        } else if (url.includes('/users')) {
-          return this.getMockUsersData(url);
-        } else {
-          // 默认返回成功
-          return { success: true, message: '操作成功' };
-        }
-      }
-      
-      // 如果是普通token，正常发送请求
+      // 使用token进行认证
       if (token) {
         options.headers['Authorization'] = `Bearer ${token}`;
       }

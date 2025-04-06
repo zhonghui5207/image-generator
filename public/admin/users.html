@@ -175,9 +175,14 @@
             response.users.forEach(user => {
               const row = document.createElement('tr');
               
+              // ID
+              const idCell = document.createElement('td');
+              idCell.textContent = user._id || '';
+              row.appendChild(idCell);
+              
               // 用户名
               const usernameCell = document.createElement('td');
-              usernameCell.textContent = user.username;
+              usernameCell.textContent = user.username || '';
               row.appendChild(usernameCell);
               
               // 邮箱
@@ -202,10 +207,11 @@
               
               // 用户统计
               const statsCell = document.createElement('td');
+              const stats = user.stats || {};
               statsCell.innerHTML = `
-                <span title="生成图像数量">图像: ${user.stats?.imagesCount || 0}</span><br>
-                <span title="订单数量">订单: ${user.stats?.ordersCount || 0}</span><br>
-                <span title="消费金额">消费: ${adminUtils.formatCurrency(user.stats?.totalSpent || 0)}</span>
+                <span title="生成图像数量">图像: ${stats.imagesCount || 0}</span><br>
+                <span title="订单数量">订单: ${stats.ordersCount || 0}</span><br>
+                <span title="消费金额">消费: ${adminUtils.formatCurrency(stats.totalSpent || 0)}</span>
               `;
               row.appendChild(statsCell);
               
@@ -388,18 +394,27 @@
       // 加载用户统计数据
       async function loadUserStats() {
         try {
+          const totalUsersElement = document.getElementById('totalUsers');
+          const activeUsersElement = document.getElementById('activeUsers');
+          const newUsersElement = document.getElementById('newUsers');
+          
+          // 如果页面上没有这些元素，直接返回
+          if (!totalUsersElement && !activeUsersElement && !newUsersElement) {
+            return;
+          }
+          
           const response = await adminUtils.apiRequest('/api/admin/dashboard');
           
           if (response && response.success) {
-            totalUsersElement.textContent = response.stats.totalUsers;
-            activeUsersElement.textContent = response.stats.totalUsers; // 暂时没有单独的活跃用户统计
-            newUsersElement.textContent = response.stats.newUsers;
+            if (totalUsersElement) totalUsersElement.textContent = response.stats.totalUsers || 0;
+            if (activeUsersElement) activeUsersElement.textContent = response.stats.activeUsers || response.stats.totalUsers || 0;
+            if (newUsersElement) newUsersElement.textContent = response.stats.newUsers || 0;
           } else {
-            adminUtils.showNotification(response.message || '加载用户统计数据失败', 'error');
+            adminUtils.showNotification('加载用户统计数据失败', 'error');
           }
         } catch (error) {
-          adminUtils.showNotification('加载用户统计数据时发生错误', 'error');
           console.error('加载用户统计数据错误:', error);
+          adminUtils.showNotification('加载用户统计数据时发生错误', 'error');
         }
       }
       
