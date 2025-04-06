@@ -12,10 +12,23 @@ document.addEventListener('DOMContentLoaded', function() {
       const password = document.getElementById('password').value;
       const errorElement = document.getElementById('login-error');
       
+      // 验证输入
+      if (!email || !password) {
+        errorElement.textContent = '邮箱和密码不能为空';
+        errorElement.style.display = 'block';
+        return;
+      }
+      
       // 隐藏之前的错误信息
       errorElement.style.display = 'none';
       
       try {
+        // 禁用按钮并显示加载状态
+        const submitButton = loginForm.querySelector('button[type="submit"]');
+        const originalText = submitButton.innerHTML;
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 登录中...';
+        
         // 发送登录请求
         const response = await fetch('/api/auth/login', {
           method: 'POST',
@@ -30,16 +43,29 @@ document.addEventListener('DOMContentLoaded', function() {
         if (response.ok) {
           // 登录成功，重定向到首页
           localStorage.setItem('user', JSON.stringify(data.user));
-          window.location.href = '/';
+          
+          // 检查是否需要绑定手机号
+          if (data.user && !data.user.phoneVerified) {
+            window.location.href = '/bind-phone.html';
+          } else {
+            window.location.href = '/';
+          }
         } else {
           // 显示错误信息
           errorElement.textContent = data.message || '登录失败，请检查您的邮箱和密码';
           errorElement.style.display = 'block';
+          submitButton.disabled = false;
+          submitButton.innerHTML = originalText;
         }
       } catch (error) {
         console.error('登录错误:', error);
         errorElement.textContent = '登录请求失败，请稍后再试';
         errorElement.style.display = 'block';
+        
+        // 恢复按钮状态
+        const submitButton = loginForm.querySelector('button[type="submit"]');
+        submitButton.disabled = false;
+        submitButton.innerHTML = '登录';
       }
     });
   }

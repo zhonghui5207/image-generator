@@ -57,28 +57,35 @@ router.post('/register', async (req, res) => {
 // 用户登录
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    console.log('收到登录请求:', req.body);
+    const { username, email, password } = req.body;
     
-    if (!username || !password) {
-      return res.status(400).json({ success: false, message: '用户名和密码不能为空' });
+    // 支持使用用户名或邮箱登录
+    if ((!username && !email) || !password) {
+      return res.status(400).json({ success: false, message: '用户名/邮箱和密码不能为空' });
     }
     
-    // 查找用户，支持使用用户名或邮箱登录
-    const user = await User.findOne({ 
-      $or: [
-        { username: username },
-        { email: username }
-      ]
-    });
+    let user;
+    
+    // 根据提供的凭据查找用户
+    if (email) {
+      // 前台登录 - 使用邮箱
+      user = await User.findOne({ email });
+      console.log('使用邮箱查找用户:', email);
+    } else {
+      // 后台登录 - 使用用户名
+      user = await User.findOne({ username });
+      console.log('使用用户名查找用户:', username);
+    }
     
     if (!user) {
-      return res.status(401).json({ success: false, message: '用户名或密码不正确' });
+      return res.status(401).json({ success: false, message: '用户名/邮箱或密码不正确' });
     }
     
     // 验证密码
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: '用户名或密码不正确' });
+      return res.status(401).json({ success: false, message: '用户名/邮箱或密码不正确' });
     }
     
     // 更新最后登录时间
@@ -95,6 +102,8 @@ router.post('/login', async (req, res) => {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict'
     });
+    
+    console.log('登录成功, 用户:', user.username);
     
     res.json({
       success: true,
