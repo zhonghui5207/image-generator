@@ -577,11 +577,34 @@ document.addEventListener('DOMContentLoaded', () => {
                       title: '柯达鸭生成的图像',
                     }).catch(err => {
                       console.log('分享失败，尝试其他方式下载', err);
-                      window.open(url, '_blank');
+                      // 创建下载链接
+                      const a = document.createElement('a');
+                      a.style.display = 'none';
+                      a.href = url;
+                      a.download = fileName;
+                      document.body.appendChild(a);
+                      a.click();
+                      
+                      // 清理
+                      setTimeout(function() {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                      }, 100);
                     });
                   } else {
-                    // 回退到在新窗口打开图片
-                    window.open(url, '_blank');
+                    // 创建下载链接而非打开新窗口
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // 清理
+                    setTimeout(function() {
+                      document.body.removeChild(a);
+                      window.URL.revokeObjectURL(url);
+                    }, 100);
                   }
                 } catch (err) {
                   console.error('Android设备下载失败:', err);

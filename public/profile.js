@@ -506,29 +506,53 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.body.appendChild(tempImg);
                   } else {
                     // Android设备
+                    const imageType = btn.textContent.includes('PNG') ? 'image/png' : 'image/jpeg';
                     canvas.toBlob(function(blob) {
                       try {
-                        const fileName = `generated-image-${image._id || Date.now()}.jpg`;
-                        
-                        // 使用navigator.share API如果可用
                         if (navigator.share) {
-                          const file = new File([blob], fileName, { type: 'image/jpeg' });
+                          const fileName = `generated-image-${Date.now()}.${imageType === 'image/png' ? 'png' : 'jpg'}`;
+                          const file = new File([blob], fileName, { type: imageType });
                           navigator.share({
                             files: [file],
                             title: '柯达鸭生成的图像',
                           }).catch(err => {
                             console.log('分享失败，尝试其他方式下载', err);
-                            window.open(jpegBlob, '_blank');
+                            // 创建下载链接
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.style.display = 'none';
+                            a.href = url;
+                            a.download = fileName;
+                            document.body.appendChild(a);
+                            a.click();
+                            
+                            // 清理
+                            setTimeout(function() {
+                              document.body.removeChild(a);
+                              window.URL.revokeObjectURL(url);
+                            }, 100);
                           });
                         } else {
-                          // 回退到在新窗口打开图片
-                          window.open(jpegBlob, '_blank');
+                          // 创建下载链接
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.style.display = 'none';
+                          a.href = url;
+                          a.download = `generated-image-${Date.now()}.${imageType === 'image/png' ? 'png' : 'jpg'}`;
+                          document.body.appendChild(a);
+                          a.click();
+                          
+                          // 清理
+                          setTimeout(function() {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                          }, 100);
                         }
                       } catch (err) {
                         console.error('Android设备下载失败:', err);
-                        window.open(jpegBlob, '_blank');
+                        window.open(canvas.toDataURL(imageType), '_blank');
                       }
-                    }, 'image/jpeg', 0.9);
+                    }, imageType, 0.9);
                   }
                 };
               }
@@ -585,29 +609,53 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.body.appendChild(tempImg);
                   } else {
                     // Android设备
+                    const imageType = btn.textContent.includes('PNG') ? 'image/png' : 'image/jpeg';
                     canvas.toBlob(function(blob) {
                       try {
-                        const fileName = `generated-image-${image._id || Date.now()}.png`;
-                        
-                        // 使用navigator.share API如果可用
                         if (navigator.share) {
-                          const file = new File([blob], fileName, { type: 'image/png' });
+                          const fileName = `generated-image-${Date.now()}.${imageType === 'image/png' ? 'png' : 'jpg'}`;
+                          const file = new File([blob], fileName, { type: imageType });
                           navigator.share({
                             files: [file],
                             title: '柯达鸭生成的图像',
                           }).catch(err => {
                             console.log('分享失败，尝试其他方式下载', err);
-                            window.open(pngBlob, '_blank');
+                            // 创建下载链接
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.style.display = 'none';
+                            a.href = url;
+                            a.download = fileName;
+                            document.body.appendChild(a);
+                            a.click();
+                            
+                            // 清理
+                            setTimeout(function() {
+                              document.body.removeChild(a);
+                              window.URL.revokeObjectURL(url);
+                            }, 100);
                           });
                         } else {
-                          // 回退到在新窗口打开图片
-                          window.open(pngBlob, '_blank');
+                          // 创建下载链接
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.style.display = 'none';
+                          a.href = url;
+                          a.download = `generated-image-${Date.now()}.${imageType === 'image/png' ? 'png' : 'jpg'}`;
+                          document.body.appendChild(a);
+                          a.click();
+                          
+                          // 清理
+                          setTimeout(function() {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                          }, 100);
                         }
                       } catch (err) {
                         console.error('Android设备下载失败:', err);
-                        window.open(pngBlob, '_blank');
+                        window.open(canvas.toDataURL(imageType), '_blank');
                       }
-                    }, 'image/png');
+                    }, imageType, 0.9);
                   }
                 };
               }
@@ -856,4 +904,186 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
   }
+  
+  // 添加全局变量，处理历史图片的直接下载
+  const bindAllDownloadButtons = function() {
+    // 查找所有下载按钮（包括历史列表中的）
+    const allDownloadBtns = document.querySelectorAll('a[download], .download-btn');
+    
+    // 检测是否为移动设备
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      allDownloadBtns.forEach(btn => {
+        const originalHref = btn.getAttribute('href');
+        // 跳过已处理的按钮
+        if (btn.getAttribute('data-mobile-handled')) return;
+        
+        btn.setAttribute('data-mobile-handled', 'true');
+        btn.removeAttribute('download');
+        
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          
+          // 如果是OSS链接，使用特殊处理
+          if (originalHref && originalHref.includes('oss-cn-beijing.aliyuncs.com')) {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = function() {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0);
+              
+              try {
+                // 为iOS设备创建临时视图
+                if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                  const imageData = canvas.toDataURL('image/jpeg', 0.9);
+                  
+                  const tempImg = document.createElement('div');
+                  tempImg.style.position = 'fixed';
+                  tempImg.style.top = '0';
+                  tempImg.style.left = '0';
+                  tempImg.style.width = '100%';
+                  tempImg.style.height = '100%';
+                  tempImg.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                  tempImg.style.zIndex = '10000';
+                  tempImg.style.display = 'flex';
+                  tempImg.style.flexDirection = 'column';
+                  tempImg.style.alignItems = 'center';
+                  tempImg.style.justifyContent = 'center';
+                  
+                  const imgElement = document.createElement('img');
+                  imgElement.src = imageData;
+                  imgElement.style.maxWidth = '90%';
+                  imgElement.style.maxHeight = '80%';
+                  imgElement.style.objectFit = 'contain';
+                  
+                  const helpText = document.createElement('p');
+                  helpText.textContent = '长按图片保存到相册';
+                  helpText.style.color = 'white';
+                  helpText.style.marginTop = '20px';
+                  helpText.style.fontSize = '16px';
+                  
+                  const closeBtn = document.createElement('button');
+                  closeBtn.textContent = '关闭';
+                  closeBtn.style.marginTop = '20px';
+                  closeBtn.style.padding = '10px 20px';
+                  closeBtn.style.backgroundColor = '#4a6bdf';
+                  closeBtn.style.color = 'white';
+                  closeBtn.style.border = 'none';
+                  closeBtn.style.borderRadius = '5px';
+                  closeBtn.onclick = function() {
+                    document.body.removeChild(tempImg);
+                  };
+                  
+                  tempImg.appendChild(imgElement);
+                  tempImg.appendChild(helpText);
+                  tempImg.appendChild(closeBtn);
+                  document.body.appendChild(tempImg);
+                } else {
+                  // Android设备
+                  const imageType = btn.textContent.includes('PNG') ? 'image/png' : 'image/jpeg';
+                  canvas.toBlob(function(blob) {
+                    try {
+                      if (navigator.share) {
+                        const fileName = `generated-image-${Date.now()}.${imageType === 'image/png' ? 'png' : 'jpg'}`;
+                        const file = new File([blob], fileName, { type: imageType });
+                        navigator.share({
+                          files: [file],
+                          title: '柯达鸭生成的图像',
+                        }).catch(err => {
+                          console.log('分享失败，尝试其他方式下载', err);
+                          // 创建下载链接
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.style.display = 'none';
+                          a.href = url;
+                          a.download = fileName;
+                          document.body.appendChild(a);
+                          a.click();
+                          
+                          // 清理
+                          setTimeout(function() {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                          }, 100);
+                        });
+                      } else {
+                        // 创建下载链接
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = `generated-image-${Date.now()}.${imageType === 'image/png' ? 'png' : 'jpg'}`;
+                        document.body.appendChild(a);
+                        a.click();
+                        
+                        // 清理
+                        setTimeout(function() {
+                          document.body.removeChild(a);
+                          window.URL.revokeObjectURL(url);
+                        }, 100);
+                      }
+                    } catch (err) {
+                      console.error('Android设备下载失败:', err);
+                      window.open(canvas.toDataURL(imageType), '_blank');
+                    }
+                  }, imageType, 0.9);
+                }
+              } catch (err) {
+                console.error('处理图片失败，尝试直接打开:', err);
+                window.open(originalHref, '_blank');
+              }
+            };
+            
+            img.onerror = function() {
+              console.error('加载图片失败，尝试直接打开');
+              window.open(originalHref, '_blank');
+            };
+            
+            img.src = originalHref;
+          } else if (originalHref) {
+            // 非OSS链接
+            window.open(originalHref, '_blank');
+          }
+        });
+      });
+    }
+  };
+  
+  // 覆盖原始的showImageDetails函数，确保每次打开模态框时绑定下载按钮事件
+  const originalShowImageDetails = window.showImageDetails || function() {};
+  window.showImageDetails = function(image) {
+    originalShowImageDetails(image);
+    // 确保在模态框打开后，立即绑定下载按钮
+    setTimeout(bindAllDownloadButtons, 100);
+  };
+  
+  // 添加到原始的loadGenerationHistory
+  const originalLoadGenerationHistory = window.loadGenerationHistory || function() {};
+  window.loadGenerationHistory = function() {
+    const result = originalLoadGenerationHistory.apply(this, arguments);
+    // 历史加载后绑定下载按钮
+    setTimeout(bindAllDownloadButtons, 500);
+    return result;
+  };
+  
+  // 初始绑定所有下载按钮
+  bindAllDownloadButtons();
+  
+  // 添加MutationObserver监听DOM变化
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.addedNodes.length) {
+        // 如果添加了新节点，检查是否需要绑定下载按钮
+        bindAllDownloadButtons();
+      }
+    });
+  });
+  
+  // 监听整个文档的变化
+  observer.observe(document.body, { childList: true, subtree: true });
 });
