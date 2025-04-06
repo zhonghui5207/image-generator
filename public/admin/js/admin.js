@@ -25,6 +25,11 @@ const adminUtils = {
       usernameElement.textContent = adminUsername;
     }
     
+    // 检查硬编码的临时管理员token
+    if (token.startsWith('hardcoded_admin_token')) {
+      return true;
+    }
+    
     // JWT令牌格式检查
     try {
       if (token.includes('.')) {

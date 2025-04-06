@@ -59,6 +59,20 @@
         // 清除错误信息
         errorMessage.style.display = 'none';
         
+        // 检查硬编码凭据
+        if (email === 'kdyai' && password === 'kdyai') {
+          // 创建硬编码token
+          const adminToken = 'hardcoded_admin_token_' + Date.now();
+          
+          // 保存管理员token和用户名
+          localStorage.setItem('adminToken', adminToken);
+          localStorage.setItem('adminUsername', 'kdyai管理员');
+          
+          // 重定向到管理后台首页
+          window.location.href = 'index.html';
+          return;
+        }
+        
         try {
           // 登录获取用户token
           const loginResponse = await fetch('/api/auth/login', {
