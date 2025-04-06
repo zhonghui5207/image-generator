@@ -198,10 +198,10 @@
 
           if (result.success) {
             startCountdown();
-            // 开发环境下，如果返回了验证码，自动填充
-            if (result.code) {
-              verificationCodeInput.value = result.code;
-            }
+            // // 开发环境下，如果返回了验证码，自动填充
+            // if (result.code) {
+            //   verificationCodeInput.value = result.code;
+            // }
           } else {
             phoneError.textContent = result.message || '发送验证码失败';
             phoneError.style.display = 'block';
@@ -266,7 +266,7 @@
           if (result.success) {
             // 绑定成功，跳转到首页
             window.location.href = '/index.html';
-          } else if (result.message && result.message.includes('已被绑定')) {
+          } else if (result.phoneAlreadyBound || (result.message && result.message.includes('已被绑定'))) {
             // 手机号已被绑定，直接重定向到登录页面
             window.location.href = '/login.html';
           } else {
