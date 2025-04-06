@@ -1,24 +1,11 @@
 import express from 'express';
-import { authenticate } from '../middleware/authMiddleware.js';
+import { authenticate, isAdmin } from '../utils/auth.js';
 import User from '../models/User.js';
 import Order from '../models/Order.js';
 import CreditTransaction from '../models/CreditTransaction.js';
 import GeneratedImage from '../models/GeneratedImage.js';
 
 const router = express.Router();
-
-// 中间件：验证管理员权限
-const isAdmin = async (req, res, next) => {
-  try {
-    if (!req.user || !req.user.isAdmin) {
-      return res.status(403).json({ success: false, message: '没有管理员权限' });
-    }
-    next();
-  } catch (error) {
-    console.error('管理员验证错误:', error);
-    res.status(500).json({ success: false, message: '服务器错误' });
-  }
-};
 
 // 验证管理员登录并获取信息
 router.post('/login', authenticate, async (req, res) => {

@@ -12,7 +12,8 @@ if (!JWT_SECRET) {
 
 // 生成JWT令牌
 export const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, JWT_SECRET, {
+  console.log('生成令牌，用户ID:', userId);
+  return jwt.sign({ userId: userId }, JWT_SECRET, {
     expiresIn: '30d' // 令牌30天有效
   });
 };
@@ -39,14 +40,14 @@ export const authenticate = async (req, res, next) => {
     // 验证令牌
     console.log('开始验证令牌...');
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('令牌验证成功，用户ID:', decoded.id);
+    console.log('令牌验证成功，用户ID:', decoded.userId);
     
     // 查找用户
     console.log('开始查找用户...');
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await User.findById(decoded.userId).select('-password');
     
     if (!user) {
-      console.log('用户不存在:', decoded.id);
+      console.log('用户不存在:', decoded.userId);
       return res.status(401).json({ success: false, message: '用户不存在' });
     }
     
