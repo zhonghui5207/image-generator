@@ -202,10 +202,17 @@
   <script src="js/admin.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      // 验证登录状态
-      if (!adminUtils.checkAdminAuth()) return;
+      console.log('首页加载完成，开始权限验证');
       
-      // 获取元素
+      // 验证登录状态
+      if (!adminUtils.checkAdminAuth()) {
+        console.log('权限验证失败，不加载页面数据');
+        return;
+      }
+      
+      console.log('权限验证通过，加载页面数据');
+      
+      // 获取DOM元素
       const totalUsersElement = document.getElementById('total-users');
       const totalImagesElement = document.getElementById('total-images');
       const todayOrdersElement = document.getElementById('today-orders');

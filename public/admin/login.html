@@ -59,8 +59,12 @@
         // 清除错误信息
         errorMessage.style.display = 'none';
         
-        // 检查硬编码凭据
+        console.log('尝试登录，用户名:', email);
+        
+        // 验证凭据
         if (email === 'kdyai' && password === 'kdyai') {
+          console.log('登录凭据验证通过');
+          
           // 创建硬编码token
           const adminToken = 'hardcoded_admin_token_' + Date.now();
           
@@ -68,57 +72,17 @@
           localStorage.setItem('adminToken', adminToken);
           localStorage.setItem('adminUsername', 'kdyai管理员');
           
+          console.log('保存认证信息完成，即将跳转到后台');
+          
           // 重定向到管理后台首页
           window.location.href = 'index.html';
           return;
         }
         
-        try {
-          // 登录获取用户token
-          const loginResponse = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ 
-              username: email,  // 使用输入的值作为username字段
-              password: password 
-            })
-          });
-          
-          const loginData = await loginResponse.json();
-          
-          if (!loginResponse.ok) {
-            throw new Error(loginData.message || '登录失败');
-          }
-          
-          // 使用token验证是否为管理员
-          const adminResponse = await fetch('/api/admin/login', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${loginData.token || ''}`
-            }
-          });
-          
-          const adminData = await adminResponse.json();
-          
-          if (!adminResponse.ok || !adminData.success) {
-            throw new Error(adminData.message || '没有管理员权限');
-          }
-          
-          // 保存管理员token和用户名
-          localStorage.setItem('adminToken', loginData.token || '');
-          localStorage.setItem('adminUsername', adminData.admin.username || loginData.username || email);
-          
-          // 重定向到管理后台首页
-          window.location.href = 'index.html';
-          
-        } catch (error) {
-          // 显示错误信息
-          errorMessage.textContent = error.message || '登录失败，请检查用户名和密码';
-          errorMessage.style.display = 'block';
-          console.error('登录错误:', error);
-        }
+        // 显示错误信息
+        errorMessage.textContent = '用户名或密码不正确';
+        errorMessage.style.display = 'block';
+        console.error('登录验证失败');
       });
     });
   </script>

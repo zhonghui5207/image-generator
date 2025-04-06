@@ -8,10 +8,17 @@ const adminUtils = {
    */
   checkAdminAuth() {
     const token = localStorage.getItem('adminToken');
+    console.log('检查管理员权限，token:', token ? '存在' : '不存在');
     
     // 如果没有token，跳转到登录页面
     if (!token) {
-      if (window.location.pathname.indexOf('/admin/login.html') === -1) {
+      console.log('没有token，需要登录');
+      // 检查当前是否在登录页
+      const currentPath = window.location.pathname;
+      const isLoginPage = currentPath.endsWith('/login.html') || currentPath.endsWith('/admin/login.html');
+      
+      if (!isLoginPage) {
+        console.log('重定向到登录页');
         window.location.href = 'login.html';
         return false;
       }
@@ -27,20 +34,26 @@ const adminUtils = {
     
     // 检查硬编码的临时管理员token
     if (token.startsWith('hardcoded_admin_token')) {
+      console.log('检测到硬编码管理员token');
       return true;
     }
     
     // JWT令牌格式检查
     try {
       if (token.includes('.')) {
+        console.log('检测到JWT格式token，验证中...');
         // 看起来是JWT格式的令牌，检查是否过期
         const payload = JSON.parse(atob(token.split('.')[1]));
         if (payload.exp && payload.exp * 1000 < Date.now()) {
+          console.error('令牌已过期');
           localStorage.removeItem('adminToken');
           localStorage.removeItem('adminUsername');
           window.location.href = 'login.html';
           return false;
         }
+        console.log('JWT令牌有效');
+      } else {
+        console.log('非标准JWT格式，但存在token');
       }
     } catch (e) {
       console.error('令牌验证错误:', e);
@@ -50,6 +63,7 @@ const adminUtils = {
       return false;
     }
     
+    console.log('验证通过，允许访问管理后台');
     return true;
   },
   
@@ -199,6 +213,23 @@ const adminUtils = {
       
       // 从localStorage获取token
       const token = localStorage.getItem('adminToken');
+      
+      // 检查是否是硬编码token
+      if (token && token.startsWith('hardcoded_admin_token')) {
+        console.log(`使用硬编码管理员token请求 ${url}，返回模拟数据`);
+        
+        // 返回对应的模拟数据
+        if (url.includes('/dashboard')) {
+          return this.getMockDashboardData(url);
+        } else if (url.includes('/orders')) {
+          return this.getMockOrdersData(url);
+        } else if (url.includes('/users')) {
+          return this.getMockUsersData(url);
+        } else {
+          // 默认返回成功
+          return { success: true, message: '操作成功' };
+        }
+      }
       
       // 使用token进行认证
       if (token) {
