@@ -126,4 +126,63 @@ export async function sendNotification(phoneNumber, params, templateId = null) {
       error: error.toString()
     };
   }
+}
+
+/**
+ * 发送密码重置验证码
+ * @param {string} phoneNumber - 手机号码，格式：+86xxxxxxxxxx
+ * @param {string} code - 验证码
+ * @returns {Promise<object>} - 发送结果
+ */
+export async function sendPasswordResetCode(phoneNumber, code) {
+  try {
+    // 检查手机号格式
+    if (!phoneNumber || !phoneNumber.startsWith('+86')) {
+      throw new Error('手机号格式错误，请使用+86格式');
+    }
+    
+    // 净化手机号，去掉+86前缀
+    const cleanPhoneNumber = phoneNumber.replace('+86', '');
+    
+    // 使用密码重置特定的模板ID
+    const resetPasswordTemplateId = process.env.TENCENT_SMS_RESET_PASSWORD_TEMPLATE_ID;
+    
+    if (!resetPasswordTemplateId) {
+      console.warn('未配置密码重置短信模板ID，将使用默认验证码模板');
+    }
+    
+    const params = {
+      PhoneNumberSet: [cleanPhoneNumber],
+      SmsSdkAppId: process.env.TENCENT_SMS_SDK_APP_ID,
+      SignName: process.env.TENCENT_SMS_SIGN_NAME,
+      TemplateId: resetPasswordTemplateId || process.env.TENCENT_SMS_TEMPLATE_ID, // 如果未配置特定模板，则使用默认模板
+      TemplateParamSet: [code],
+    };
+    
+    console.log('发送密码重置验证码，参数:', JSON.stringify(params));
+    const result = await client.SendSms(params);
+    console.log('密码重置短信发送结果:', JSON.stringify(result));
+    
+    // 检查发送结果
+    if (result.SendStatusSet && result.SendStatusSet.length > 0) {
+      if (result.SendStatusSet[0].Code === 'Ok') {
+        return {
+          success: true,
+          message: '短信发送成功',
+          data: result
+        };
+      } else {
+        throw new Error(`短信发送失败: ${result.SendStatusSet[0].Message}`);
+      }
+    } else {
+      throw new Error('短信发送失败，未收到有效的响应');
+    }
+  } catch (error) {
+    console.error('发送密码重置验证码出错:', error);
+    return {
+      success: false,
+      message: error.message || '短信发送失败',
+      error: error.toString()
+    };
+  }
 } 

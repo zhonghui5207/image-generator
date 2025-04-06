@@ -1,8 +1,21 @@
 import express from 'express';
 import User from '../models/User.js';
 import { generateToken, authenticate } from '../utils/auth.js';
+import { sendVerificationCode, sendPasswordResetCode } from '../utils/sms.js';
 
 const router = express.Router();
+
+// 临时存储重置密码验证码（实际环境中应使用Redis或数据库存储）
+const resetPasswordCodes = {};
+
+// 生成随机验证码
+function generateVerificationCode(length = 6) {
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += Math.floor(Math.random() * 10).toString();
+  }
+  return code;
+}
 
 // 注册新用户
 router.post('/register', async (req, res) => {
@@ -188,6 +201,135 @@ router.post('/logout', (req, res) => {
     expires: new Date(0)
   });
   res.json({ success: true, message: '成功登出' });
+});
+
+// 发送重置密码验证码
+router.post('/send-reset-code', async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: '手机号不能为空' });
+    }
+    
+    // 检查该手机号是否存在
+    const user = await User.findOne({ phoneNumber });
+    if (!user) {
+      return res.status(400).json({ success: false, message: '该手机号未注册' });
+    }
+    
+    // 生成6位数验证码
+    const code = generateVerificationCode();
+    
+    // 使用专门的密码重置短信模板发送验证码
+    const smsResult = await sendPasswordResetCode(phoneNumber, code);
+    
+    if (!smsResult.success) {
+      return res.status(500).json({ 
+        success: false, 
+        message: '短信发送失败: ' + smsResult.message
+      });
+    }
+    
+    // 存储验证码（设置10分钟过期时间）
+    resetPasswordCodes[phoneNumber] = {
+      code,
+      userId: user._id,
+      expireAt: Date.now() + 10 * 60 * 1000 // 10分钟后过期
+    };
+    
+    // 在开发环境下返回验证码以便测试
+    const response = {
+      success: true,
+      message: '验证码已发送'
+    };
+    
+    if (process.env.NODE_ENV !== 'production') {
+      response.code = code;
+    }
+    
+    res.json(response);
+  } catch (error) {
+    console.error('发送重置密码验证码错误:', error);
+    res.status(500).json({ success: false, message: '服务器错误' });
+  }
+});
+
+// 验证重置密码验证码
+router.post('/verify-reset-code', async (req, res) => {
+  try {
+    const { phoneNumber, code } = req.body;
+    
+    if (!phoneNumber || !code) {
+      return res.status(400).json({ success: false, message: '手机号和验证码不能为空' });
+    }
+    
+    // 检查验证码是否存在且有效
+    const storedData = resetPasswordCodes[phoneNumber];
+    if (!storedData) {
+      return res.status(400).json({ success: false, message: '验证码不存在或已过期' });
+    }
+    
+    // 检查验证码是否过期
+    if (Date.now() > storedData.expireAt) {
+      // 删除过期验证码
+      delete resetPasswordCodes[phoneNumber];
+      return res.status(400).json({ success: false, message: '验证码已过期，请重新获取' });
+    }
+    
+    // 验证码是否匹配
+    if (storedData.code !== code) {
+      return res.status(400).json({ success: false, message: '验证码不正确' });
+    }
+    
+    // 验证码有效
+    res.json({ success: true, message: '验证码验证成功' });
+  } catch (error) {
+    console.error('验证重置密码验证码错误:', error);
+    res.status(500).json({ success: false, message: '服务器错误' });
+  }
+});
+
+// 重置密码
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { phoneNumber, newPassword } = req.body;
+    
+    if (!phoneNumber || !newPassword) {
+      return res.status(400).json({ success: false, message: '手机号和新密码不能为空' });
+    }
+    
+    // 检查是否通过验证码验证
+    const storedData = resetPasswordCodes[phoneNumber];
+    if (!storedData) {
+      return res.status(400).json({ success: false, message: '请先验证手机验证码' });
+    }
+    
+    // 检查验证码是否过期
+    if (Date.now() > storedData.expireAt) {
+      // 删除过期验证码
+      delete resetPasswordCodes[phoneNumber];
+      return res.status(400).json({ success: false, message: '验证码已过期，请重新验证' });
+    }
+    
+    // 查找用户
+    const user = await User.findOne({ phoneNumber });
+    if (!user) {
+      return res.status(400).json({ success: false, message: '用户不存在' });
+    }
+    
+    // 更新密码
+    user.password = newPassword;
+    await user.save();
+    
+    // 删除已使用的验证码
+    delete resetPasswordCodes[phoneNumber];
+    
+    res.json({ success: true, message: '密码重置成功' });
+  } catch (error) {
+    console.error('重置密码错误:', error);
+    res.status(500).json({ success: false, message: '服务器错误' });
+  }
 });
 
 export default router;
