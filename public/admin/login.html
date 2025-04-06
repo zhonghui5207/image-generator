@@ -66,7 +66,10 @@
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ 
+              username: email,  // 使用输入的值作为username字段
+              password: password 
+            })
           });
           
           const loginData = await loginResponse.json();

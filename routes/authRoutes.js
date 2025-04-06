@@ -57,18 +57,28 @@ router.post('/register', async (req, res) => {
 // 用户登录
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
     
-    // 查找用户
-    const user = await User.findOne({ email });
+    if (!username || !password) {
+      return res.status(400).json({ success: false, message: '用户名和密码不能为空' });
+    }
+    
+    // 查找用户，支持使用用户名或邮箱登录
+    const user = await User.findOne({ 
+      $or: [
+        { username: username },
+        { email: username }
+      ]
+    });
+    
     if (!user) {
-      return res.status(401).json({ success: false, message: '邮箱或密码不正确' });
+      return res.status(401).json({ success: false, message: '用户名或密码不正确' });
     }
     
     // 验证密码
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: '邮箱或密码不正确' });
+      return res.status(401).json({ success: false, message: '用户名或密码不正确' });
     }
     
     // 更新最后登录时间
