@@ -214,7 +214,7 @@
       const recentOrdersTableBody = document.getElementById('recent-orders');
       const logoutBtn = document.getElementById('logout-btn');
       
-      // 加载统计数据
+      // 加载仪表盘统计数据
       async function loadDashboardStats() {
         try {
           const response = await adminUtils.apiRequest('/api/admin/dashboard');
@@ -231,11 +231,11 @@
               todayRevenueElement.textContent = adminUtils.formatCurrency(orderStatsResponse.stats.todayRevenue || 0);
             }
           } else {
-            adminUtils.showNotification(response.message || '加载统计数据失败', 'error');
+            adminUtils.showNotification('加载统计数据失败', 'error');
           }
         } catch (error) {
-          adminUtils.showNotification('加载统计数据时发生错误', 'error');
           console.error('加载统计数据错误:', error);
+          adminUtils.showNotification('加载统计数据时发生错误', 'error');
         }
       }
       

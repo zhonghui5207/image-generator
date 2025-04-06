@@ -51,22 +51,17 @@ const adminUtils = {
   },
   
   /**
-   * 显示通知消息
-   * @param {string} message 消息内容
-   * @param {string} type 消息类型: success, error, info, warning
+   * 显示通知
+   * @param {string} message 通知消息
+   * @param {string} type 通知类型 (success, error, warning, info)
    */
-  showNotification(message, type = 'success', duration = 3000) {
-    // 移除现有的通知
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => {
-      document.body.removeChild(notification);
-    });
-    
-    // 创建新通知
+  showNotification(message, type = 'success') {
+    // 创建通知元素
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.textContent = message;
     
+    // 添加到页面
     document.body.appendChild(notification);
     
     // 显示通知
@@ -74,33 +69,44 @@ const adminUtils = {
       notification.classList.add('show');
     }, 10);
     
-    // 自动关闭通知
+    // 3秒后隐藏通知
     setTimeout(() => {
       notification.classList.remove('show');
       setTimeout(() => {
-        if (notification.parentNode) {
-          document.body.removeChild(notification);
-        }
+        document.body.removeChild(notification);
       }, 300);
-    }, duration);
+    }, 3000);
+  },
+  
+  /**
+   * 格式化货币
+   * @param {number} amount 金额
+   * @returns {string} 格式化后的货币字符串
+   */
+  formatCurrency(amount) {
+    return '¥' + parseFloat(amount).toFixed(2);
   },
   
   /**
    * 格式化日期时间
-   * @param {string|Date} dateStr 日期字符串或Date对象
-   * @returns {string} 格式化后的日期字符串
+   * @param {string|Date} dateTime 日期时间
+   * @returns {string} 格式化后的日期时间字符串
    */
-  formatDateTime(dateStr) {
-    if (!dateStr) return '无';
-    const date = new Date(dateStr);
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+  formatDateTime(dateTime) {
+    const date = new Date(dateTime);
+    
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      return '无效日期';
+    }
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
   },
   
   /**
@@ -116,18 +122,6 @@ const adminUtils = {
       month: '2-digit',
       day: '2-digit'
     });
-  },
-  
-  /**
-   * 格式化货币
-   * @param {number} amount 金额（分）
-   * @returns {string} 格式化后的金额字符串（元）
-   */
-  formatCurrency(amount) {
-    return new Intl.NumberFormat('zh-CN', {
-      style: 'currency',
-      currency: 'CNY'
-    }).format(amount);
   },
   
   /**
@@ -210,11 +204,11 @@ const adminUtils = {
         
         // 根据请求URL返回模拟数据
         if (url.includes('/dashboard')) {
-          return this.getMockDashboardData();
+          return this.getMockDashboardData(url);
         } else if (url.includes('/orders')) {
-          return this.getMockOrdersData();
+          return this.getMockOrdersData(url);
         } else if (url.includes('/users')) {
-          return this.getMockUsersData();
+          return this.getMockUsersData(url);
         } else {
           // 默认返回成功
           return { success: true, message: '操作成功' };
@@ -267,9 +261,11 @@ const adminUtils = {
   
   /**
    * 获取模拟的仪表板数据
+   * @param {string} url 请求URL
    * @returns {Object} 模拟的仪表板数据
    */
-  getMockDashboardData() {
+  getMockDashboardData(url) {
+    console.log('获取模拟仪表板数据', url);
     return {
       success: true,
       stats: {
@@ -284,11 +280,13 @@ const adminUtils = {
   
   /**
    * 获取模拟的订单数据
+   * @param {string} url 请求URL
    * @returns {Object} 模拟的订单数据
    */
-  getMockOrdersData() {
+  getMockOrdersData(url) {
+    console.log('获取模拟订单数据', url);
     // 检查是否是订单统计请求
-    if (arguments[0] && arguments[0].includes('/stats')) {
+    if (url && url.includes('/stats')) {
       return {
         success: true,
         stats: {
@@ -329,9 +327,11 @@ const adminUtils = {
   
   /**
    * 获取模拟的用户数据
+   * @param {string} url 请求URL
    * @returns {Object} 模拟的用户数据
    */
-  getMockUsersData() {
+  getMockUsersData(url) {
+    console.log('获取模拟用户数据', url);
     // 生成模拟用户数据
     const users = [];
     for (let i = 1; i <= 10; i++) {
