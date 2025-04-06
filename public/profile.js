@@ -437,6 +437,9 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // 设置下载链接
       if (image.generatedImage) {
+        // 检测是否为移动设备
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
         // 创建一个新的图像对象来加载 URL
         const img = new Image();
         img.crossOrigin = 'anonymous'; // 允许跨域加载
@@ -449,22 +452,237 @@ document.addEventListener('DOMContentLoaded', function() {
           ctx.drawImage(img, 0, 0);
           
           try {
-            // 设置 JPEG 下载链接
-            if (modalDownloadJpgBtn) {
-              const jpegUrl = canvas.toDataURL('image/jpeg', 0.9);
-              modalDownloadJpgBtn.href = jpegUrl;
-              modalDownloadJpgBtn.download = `generated-image-${image._id || Date.now()}.jpg`;
-            }
-            
-            // 设置 PNG 下载链接
-            if (modalDownloadPngBtn) {
-              const pngUrl = canvas.toDataURL('image/png');
-              modalDownloadPngBtn.href = pngUrl;
-              modalDownloadPngBtn.download = `generated-image-${image._id || Date.now()}.png`;
+            // 针对移动设备，我们需要设置点击事件而非直接设置href
+            if (isMobile) {
+              // 设置JPG下载按钮点击事件
+              if (modalDownloadJpgBtn) {
+                modalDownloadJpgBtn.removeAttribute("download");
+                modalDownloadJpgBtn.onclick = function(e) {
+                  e.preventDefault();
+                  const jpegBlob = canvas.toDataURL('image/jpeg', 0.9);
+                  
+                  // 为iOS设备创建临时视图
+                  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                    const tempImg = document.createElement('div');
+                    tempImg.style.position = 'fixed';
+                    tempImg.style.top = '0';
+                    tempImg.style.left = '0';
+                    tempImg.style.width = '100%';
+                    tempImg.style.height = '100%';
+                    tempImg.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                    tempImg.style.zIndex = '10000';
+                    tempImg.style.display = 'flex';
+                    tempImg.style.flexDirection = 'column';
+                    tempImg.style.alignItems = 'center';
+                    tempImg.style.justifyContent = 'center';
+                    
+                    const imgElement = document.createElement('img');
+                    imgElement.src = jpegBlob;
+                    imgElement.style.maxWidth = '90%';
+                    imgElement.style.maxHeight = '80%';
+                    imgElement.style.objectFit = 'contain';
+                    
+                    const helpText = document.createElement('p');
+                    helpText.textContent = '长按图片保存到相册';
+                    helpText.style.color = 'white';
+                    helpText.style.marginTop = '20px';
+                    helpText.style.fontSize = '16px';
+                    
+                    const closeBtn = document.createElement('button');
+                    closeBtn.textContent = '关闭';
+                    closeBtn.style.marginTop = '20px';
+                    closeBtn.style.padding = '10px 20px';
+                    closeBtn.style.backgroundColor = '#4a6bdf';
+                    closeBtn.style.color = 'white';
+                    closeBtn.style.border = 'none';
+                    closeBtn.style.borderRadius = '5px';
+                    closeBtn.onclick = function() {
+                      document.body.removeChild(tempImg);
+                    };
+                    
+                    tempImg.appendChild(imgElement);
+                    tempImg.appendChild(helpText);
+                    tempImg.appendChild(closeBtn);
+                    document.body.appendChild(tempImg);
+                  } else {
+                    // Android设备
+                    canvas.toBlob(function(blob) {
+                      try {
+                        const fileName = `generated-image-${image._id || Date.now()}.jpg`;
+                        
+                        // 使用navigator.share API如果可用
+                        if (navigator.share) {
+                          const file = new File([blob], fileName, { type: 'image/jpeg' });
+                          navigator.share({
+                            files: [file],
+                            title: '柯达鸭生成的图像',
+                          }).catch(err => {
+                            console.log('分享失败，尝试其他方式下载', err);
+                            window.open(jpegBlob, '_blank');
+                          });
+                        } else {
+                          // 回退到在新窗口打开图片
+                          window.open(jpegBlob, '_blank');
+                        }
+                      } catch (err) {
+                        console.error('Android设备下载失败:', err);
+                        window.open(jpegBlob, '_blank');
+                      }
+                    }, 'image/jpeg', 0.9);
+                  }
+                };
+              }
+              
+              // 设置PNG下载按钮点击事件
+              if (modalDownloadPngBtn) {
+                modalDownloadPngBtn.removeAttribute("download");
+                modalDownloadPngBtn.onclick = function(e) {
+                  e.preventDefault();
+                  const pngBlob = canvas.toDataURL('image/png');
+                  
+                  // 为iOS设备创建临时视图
+                  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                    const tempImg = document.createElement('div');
+                    tempImg.style.position = 'fixed';
+                    tempImg.style.top = '0';
+                    tempImg.style.left = '0';
+                    tempImg.style.width = '100%';
+                    tempImg.style.height = '100%';
+                    tempImg.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                    tempImg.style.zIndex = '10000';
+                    tempImg.style.display = 'flex';
+                    tempImg.style.flexDirection = 'column';
+                    tempImg.style.alignItems = 'center';
+                    tempImg.style.justifyContent = 'center';
+                    
+                    const imgElement = document.createElement('img');
+                    imgElement.src = pngBlob;
+                    imgElement.style.maxWidth = '90%';
+                    imgElement.style.maxHeight = '80%';
+                    imgElement.style.objectFit = 'contain';
+                    
+                    const helpText = document.createElement('p');
+                    helpText.textContent = '长按图片保存到相册';
+                    helpText.style.color = 'white';
+                    helpText.style.marginTop = '20px';
+                    helpText.style.fontSize = '16px';
+                    
+                    const closeBtn = document.createElement('button');
+                    closeBtn.textContent = '关闭';
+                    closeBtn.style.marginTop = '20px';
+                    closeBtn.style.padding = '10px 20px';
+                    closeBtn.style.backgroundColor = '#4a6bdf';
+                    closeBtn.style.color = 'white';
+                    closeBtn.style.border = 'none';
+                    closeBtn.style.borderRadius = '5px';
+                    closeBtn.onclick = function() {
+                      document.body.removeChild(tempImg);
+                    };
+                    
+                    tempImg.appendChild(imgElement);
+                    tempImg.appendChild(helpText);
+                    tempImg.appendChild(closeBtn);
+                    document.body.appendChild(tempImg);
+                  } else {
+                    // Android设备
+                    canvas.toBlob(function(blob) {
+                      try {
+                        const fileName = `generated-image-${image._id || Date.now()}.png`;
+                        
+                        // 使用navigator.share API如果可用
+                        if (navigator.share) {
+                          const file = new File([blob], fileName, { type: 'image/png' });
+                          navigator.share({
+                            files: [file],
+                            title: '柯达鸭生成的图像',
+                          }).catch(err => {
+                            console.log('分享失败，尝试其他方式下载', err);
+                            window.open(pngBlob, '_blank');
+                          });
+                        } else {
+                          // 回退到在新窗口打开图片
+                          window.open(pngBlob, '_blank');
+                        }
+                      } catch (err) {
+                        console.error('Android设备下载失败:', err);
+                        window.open(pngBlob, '_blank');
+                      }
+                    }, 'image/png');
+                  }
+                };
+              }
+            } else {
+              // 桌面设备常规方式
+              // 设置 JPEG 下载链接
+              if (modalDownloadJpgBtn) {
+                const jpegUrl = canvas.toDataURL('image/jpeg', 0.9);
+                modalDownloadJpgBtn.href = jpegUrl;
+                modalDownloadJpgBtn.download = `generated-image-${image._id || Date.now()}.jpg`;
+              }
+              
+              // 设置 PNG 下载链接
+              if (modalDownloadPngBtn) {
+                const pngUrl = canvas.toDataURL('image/png');
+                modalDownloadPngBtn.href = pngUrl;
+                modalDownloadPngBtn.download = `generated-image-${image._id || Date.now()}.png`;
+              }
             }
           } catch (err) {
             console.error('转换图像格式失败:', err);
             // 如果转换失败，回退到原始 URL
+            if (isMobile) {
+              // 移动设备处理
+              if (modalDownloadJpgBtn) {
+                modalDownloadJpgBtn.removeAttribute("download");
+                modalDownloadJpgBtn.onclick = function(e) {
+                  e.preventDefault();
+                  window.open(image.generatedImage, '_blank');
+                };
+              }
+              if (modalDownloadPngBtn) {
+                modalDownloadPngBtn.removeAttribute("download");
+                modalDownloadPngBtn.onclick = function(e) {
+                  e.preventDefault();
+                  window.open(image.generatedImage, '_blank');
+                };
+              }
+            } else {
+              // 桌面设备处理
+              if (modalDownloadJpgBtn) {
+                modalDownloadJpgBtn.href = image.generatedImage;
+                modalDownloadJpgBtn.download = `generated-image-${image._id || Date.now()}.jpg`;
+              }
+              if (modalDownloadPngBtn) {
+                modalDownloadPngBtn.href = image.generatedImage;
+                modalDownloadPngBtn.download = `generated-image-${image._id || Date.now()}.png`;
+              }
+            }
+          }
+        };
+        
+        img.onerror = function() {
+          console.error('加载图像失败');
+          // 加载失败时使用原始 URL
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          
+          if (isMobile) {
+            // 移动设备处理
+            if (modalDownloadJpgBtn) {
+              modalDownloadJpgBtn.removeAttribute("download");
+              modalDownloadJpgBtn.onclick = function(e) {
+                e.preventDefault();
+                window.open(image.generatedImage, '_blank');
+              };
+            }
+            if (modalDownloadPngBtn) {
+              modalDownloadPngBtn.removeAttribute("download");
+              modalDownloadPngBtn.onclick = function(e) {
+                e.preventDefault();
+                window.open(image.generatedImage, '_blank');
+              };
+            }
+          } else {
+            // 桌面设备处理
             if (modalDownloadJpgBtn) {
               modalDownloadJpgBtn.href = image.generatedImage;
               modalDownloadJpgBtn.download = `generated-image-${image._id || Date.now()}.jpg`;
@@ -473,19 +691,6 @@ document.addEventListener('DOMContentLoaded', function() {
               modalDownloadPngBtn.href = image.generatedImage;
               modalDownloadPngBtn.download = `generated-image-${image._id || Date.now()}.png`;
             }
-          }
-        };
-        
-        img.onerror = function() {
-          console.error('加载图像失败');
-          // 加载失败时使用原始 URL
-          if (modalDownloadJpgBtn) {
-            modalDownloadJpgBtn.href = image.generatedImage;
-            modalDownloadJpgBtn.download = `generated-image-${image._id || Date.now()}.jpg`;
-          }
-          if (modalDownloadPngBtn) {
-            modalDownloadPngBtn.href = image.generatedImage;
-            modalDownloadPngBtn.download = `generated-image-${image._id || Date.now()}.png`;
           }
         };
         
