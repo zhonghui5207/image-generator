@@ -205,191 +205,184 @@
       // 验证登录状态
       if (!adminUtils.checkAdminAuth()) return;
       
-      // 获取统计元素
-      const totalUsersEl = document.getElementById('total-users');
-      const totalImagesEl = document.getElementById('total-images');
-      const todayOrdersEl = document.getElementById('today-orders');
-      const todayRevenueEl = document.getElementById('today-revenue');
+      // 获取元素
+      const totalUsersElement = document.getElementById('total-users');
+      const totalImagesElement = document.getElementById('total-images');
+      const todayOrdersElement = document.getElementById('today-orders');
+      const todayRevenueElement = document.getElementById('today-revenue');
+      const recentUsersTableBody = document.getElementById('recent-users');
+      const recentOrdersTableBody = document.getElementById('recent-orders');
+      const logoutBtn = document.getElementById('logout-btn');
       
-      // 获取最近数据元素
-      const recentUsersEl = document.getElementById('recent-users');
-      const recentOrdersEl = document.getElementById('recent-orders');
-      
-      // 加载仪表盘数据
-      async function loadDashboardData() {
+      // 加载统计数据
+      async function loadDashboardStats() {
         try {
           const response = await adminUtils.apiRequest('/api/admin/dashboard');
           
           if (response && response.success) {
             // 更新统计数据
-            totalUsersEl.textContent = response.stats.totalUsers;
-            totalImagesEl.textContent = response.stats.totalImages;
-            todayOrdersEl.textContent = response.stats.todayOrders;
-            todayRevenueEl.textContent = adminUtils.formatCurrency(response.stats.todayRevenue);
+            totalUsersElement.textContent = response.stats.totalUsers || 0;
+            totalImagesElement.textContent = response.stats.totalImages || 0;
             
-            // 渲染最近用户
-            renderRecentUsers(response.recentUsers);
-            
-            // 渲染最近订单
-            renderRecentOrders(response.recentOrders);
+            // 加载订单统计
+            const orderStatsResponse = await adminUtils.apiRequest('/api/admin/orders/stats');
+            if (orderStatsResponse && orderStatsResponse.success) {
+              todayOrdersElement.textContent = orderStatsResponse.stats.todayCount || 0;
+              todayRevenueElement.textContent = adminUtils.formatCurrency(orderStatsResponse.stats.todayRevenue || 0);
+            }
           } else {
-            adminUtils.showNotification(response.message || '加载仪表盘数据失败', 'error');
+            adminUtils.showNotification(response.message || '加载统计数据失败', 'error');
           }
         } catch (error) {
-          adminUtils.showNotification('加载仪表盘数据时发生错误', 'error');
-          console.error('加载仪表盘数据错误:', error);
+          adminUtils.showNotification('加载统计数据时发生错误', 'error');
+          console.error('加载统计数据错误:', error);
         }
       }
       
-      // 渲染最近用户
-      function renderRecentUsers(users) {
-        recentUsersEl.innerHTML = '';
-        
-        if (!users || users.length === 0) {
-          const emptyRow = document.createElement('tr');
-          const emptyCell = document.createElement('td');
-          emptyCell.colSpan = 4;
-          emptyCell.textContent = '没有最近注册的用户';
-          emptyCell.className = 'empty-table-message';
-          emptyRow.appendChild(emptyCell);
-          recentUsersEl.appendChild(emptyRow);
-          return;
-        }
-        
-        users.forEach(user => {
-          const row = document.createElement('tr');
+      // 加载最近注册用户
+      async function loadRecentUsers() {
+        try {
+          // 只获取最近5个用户
+          const response = await adminUtils.apiRequest('/api/admin/users?limit=5&page=1');
           
-          // 用户名
-          const usernameCell = document.createElement('td');
-          usernameCell.textContent = user.username;
-          row.appendChild(usernameCell);
-          
-          // 邮箱
-          const emailCell = document.createElement('td');
-          emailCell.textContent = user.email || '-';
-          row.appendChild(emailCell);
-          
-          // 注册时间
-          const createdAtCell = document.createElement('td');
-          createdAtCell.textContent = adminUtils.formatDateTime(user.createdAt);
-          row.appendChild(createdAtCell);
-          
-          // 状态
-          const statusCell = document.createElement('td');
-          const statusBadge = document.createElement('span');
-          statusBadge.className = 'badge';
-          
-          switch (user.status) {
-            case 'active':
-              statusBadge.textContent = '已激活';
-              statusBadge.classList.add('badge-success');
-              break;
-            case 'inactive':
-              statusBadge.textContent = '未激活';
-              statusBadge.classList.add('badge-warning');
-              break;
-            default:
-              statusBadge.textContent = '未知';
-              statusBadge.classList.add('badge-secondary');
+          if (response && response.success) {
+            // 清空表格
+            recentUsersTableBody.innerHTML = '';
+            
+            // 如果没有数据
+            if (response.users.length === 0) {
+              recentUsersTableBody.innerHTML = '<tr><td colspan="4" class="empty-table-message">暂无用户数据</td></tr>';
+              return;
+            }
+            
+            // 渲染用户数据
+            response.users.forEach(user => {
+              const row = document.createElement('tr');
+              
+              // 用户名
+              const usernameCell = document.createElement('td');
+              usernameCell.textContent = user.username;
+              row.appendChild(usernameCell);
+              
+              // 邮箱
+              const emailCell = document.createElement('td');
+              emailCell.textContent = user.email || '-';
+              row.appendChild(emailCell);
+              
+              // 注册时间
+              const createdAtCell = document.createElement('td');
+              createdAtCell.textContent = adminUtils.formatDateTime(user.createdAt);
+              row.appendChild(createdAtCell);
+              
+              // 状态
+              const statusCell = document.createElement('td');
+              const statusClass = user.phoneVerified ? 'status-success' : 'status-pending';
+              const statusText = user.phoneVerified ? '已验证' : '未验证';
+              
+              statusCell.innerHTML = `<span class="status-badge ${statusClass}">${statusText}</span>`;
+              row.appendChild(statusCell);
+              
+              recentUsersTableBody.appendChild(row);
+            });
+          } else {
+            recentUsersTableBody.innerHTML = '<tr><td colspan="4" class="empty-table-message">加载用户数据失败</td></tr>';
           }
+        } catch (error) {
+          recentUsersTableBody.innerHTML = '<tr><td colspan="4" class="empty-table-message">加载用户数据时发生错误</td></tr>';
+          console.error('加载最近用户错误:', error);
+        }
+      }
+      
+      // 加载最近订单
+      async function loadRecentOrders() {
+        try {
+          // 只获取最近5个订单
+          const response = await adminUtils.apiRequest('/api/admin/orders?limit=5&page=1');
           
-          statusCell.appendChild(statusBadge);
-          row.appendChild(statusCell);
-          
-          recentUsersEl.appendChild(row);
+          if (response && response.success) {
+            // 清空表格
+            recentOrdersTableBody.innerHTML = '';
+            
+            // 如果没有数据
+            if (response.orders.length === 0) {
+              recentOrdersTableBody.innerHTML = '<tr><td colspan="4" class="empty-table-message">暂无订单数据</td></tr>';
+              return;
+            }
+            
+            // 渲染订单数据
+            response.orders.forEach(order => {
+              const row = document.createElement('tr');
+              
+              // 订单号
+              const orderNumberCell = document.createElement('td');
+              orderNumberCell.textContent = order.orderNumber;
+              row.appendChild(orderNumberCell);
+              
+              // 用户
+              const userCell = document.createElement('td');
+              userCell.textContent = order.user ? order.user.username : '未知用户';
+              row.appendChild(userCell);
+              
+              // 金额
+              const amountCell = document.createElement('td');
+              amountCell.textContent = adminUtils.formatCurrency(order.amount);
+              row.appendChild(amountCell);
+              
+              // 状态
+              const statusCell = document.createElement('td');
+              let statusClass = '';
+              let statusText = '';
+              
+              switch (order.status) {
+                case 'pending':
+                  statusClass = 'status-pending';
+                  statusText = '待支付';
+                  break;
+                case 'paid':
+                  statusClass = 'status-success';
+                  statusText = '已支付';
+                  break;
+                case 'cancelled':
+                  statusClass = 'status-cancelled';
+                  statusText = '已取消';
+                  break;
+                case 'refunded':
+                  statusClass = 'status-warning';
+                  statusText = '已退款';
+                  break;
+                default:
+                  statusClass = 'status-default';
+                  statusText = order.status;
+              }
+              
+              statusCell.innerHTML = `<span class="status-badge ${statusClass}">${statusText}</span>`;
+              row.appendChild(statusCell);
+              
+              recentOrdersTableBody.appendChild(row);
+            });
+          } else {
+            recentOrdersTableBody.innerHTML = '<tr><td colspan="4" class="empty-table-message">加载订单数据失败</td></tr>';
+          }
+        } catch (error) {
+          recentOrdersTableBody.innerHTML = '<tr><td colspan="4" class="empty-table-message">加载订单数据时发生错误</td></tr>';
+          console.error('加载最近订单错误:', error);
+        }
+      }
+      
+      // 绑定退出登录按钮
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUsername');
+          window.location.href = 'login.html';
         });
       }
       
-      // 渲染最近订单
-      function renderRecentOrders(orders) {
-        recentOrdersEl.innerHTML = '';
-        
-        if (!orders || orders.length === 0) {
-          const emptyRow = document.createElement('tr');
-          const emptyCell = document.createElement('td');
-          emptyCell.colSpan = 4;
-          emptyCell.textContent = '没有最近订单';
-          emptyCell.className = 'empty-table-message';
-          emptyRow.appendChild(emptyCell);
-          recentOrdersEl.appendChild(emptyRow);
-          return;
-        }
-        
-        orders.forEach(order => {
-          const row = document.createElement('tr');
-          
-          // 订单号
-          const orderIdCell = document.createElement('td');
-          orderIdCell.textContent = order.orderNumber;
-          row.appendChild(orderIdCell);
-          
-          // 用户
-          const userCell = document.createElement('td');
-          userCell.textContent = order.username;
-          row.appendChild(userCell);
-          
-          // 金额
-          const amountCell = document.createElement('td');
-          amountCell.textContent = adminUtils.formatCurrency(order.amount);
-          row.appendChild(amountCell);
-          
-          // 状态
-          const statusCell = document.createElement('td');
-          const statusBadge = document.createElement('span');
-          statusBadge.className = 'badge';
-          
-          switch (order.status) {
-            case 'completed':
-              statusBadge.textContent = '已完成';
-              statusBadge.classList.add('badge-success');
-              break;
-            case 'pending':
-              statusBadge.textContent = '处理中';
-              statusBadge.classList.add('badge-warning');
-              break;
-            case 'failed':
-              statusBadge.textContent = '失败';
-              statusBadge.classList.add('badge-danger');
-              break;
-            default:
-              statusBadge.textContent = order.status;
-              statusBadge.classList.add('badge-secondary');
-          }
-          
-          statusCell.appendChild(statusBadge);
-          row.appendChild(statusCell);
-          
-          recentOrdersEl.appendChild(row);
-        });
-      }
-      
-      // 初始加载
-      loadDashboardData();
-      
-      // 添加事件监听
-      document.getElementById('toggle-sidebar').addEventListener('click', function() {
-        document.getElementById('sidebar').classList.toggle('collapsed');
-        document.querySelector('.main-content').classList.toggle('expanded');
-      });
-      
-      document.getElementById('user-menu-btn').addEventListener('click', function() {
-        document.getElementById('user-dropdown').classList.toggle('show');
-      });
-      
-      document.getElementById('logout-btn').addEventListener('click', function(e) {
-        e.preventDefault();
-        adminUtils.logout();
-      });
-      
-      // 点击页面其他地方关闭下拉菜单
-      window.addEventListener('click', function(e) {
-        if (!e.target.matches('.user-menu-btn') && !e.target.parentNode.matches('.user-menu-btn')) {
-          const dropdown = document.getElementById('user-dropdown');
-          if (dropdown.classList.contains('show')) {
-            dropdown.classList.remove('show');
-          }
-        }
-      });
+      // 初始加载数据
+      loadDashboardStats();
+      loadRecentUsers();
+      loadRecentOrders();
     });
   </script>
   
@@ -496,3 +489,4 @@
   </style>
 </body>
 </html>
+

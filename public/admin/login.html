@@ -1,1 +1,217 @@
-
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理员登录 - AI图像生成器</title>
+  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-color: #f5f8fa;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .login-container {
+      width: 400px;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      padding: 40px;
+    }
+    
+    .login-logo {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .login-logo h2 {
+      color: #2c3e50;
+      margin: 0;
+      font-size: 24px;
+    }
+    
+    .login-logo p {
+      color: #7f8c8d;
+      margin: 5px 0 0;
+    }
+    
+    .login-form .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .login-form label {
+      display: block;
+      margin-bottom: 8px;
+      color: #34495e;
+      font-weight: 500;
+    }
+    
+    .login-form input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+    
+    .login-form input:focus {
+      border-color: #3498db;
+      outline: none;
+    }
+    
+    .login-form .submit-btn {
+      width: 100%;
+      padding: 12px;
+      background-color: #3498db;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    .login-form .submit-btn:hover {
+      background-color: #2980b9;
+    }
+    
+    .error-message {
+      background-color: #f8d7da;
+      color: #721c24;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    
+    .login-footer {
+      text-align: center;
+      margin-top: 20px;
+      color: #7f8c8d;
+      font-size: 13px;
+    }
+    
+    .login-footer a {
+      color: #3498db;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-logo">
+      <h2>柯达鸭 AI 图像生成器</h2>
+      <p>管理后台登录</p>
+    </div>
+    
+    <div id="error-message" class="error-message"></div>
+    
+    <form id="login-form" class="login-form">
+      <div class="form-group">
+        <label for="email">邮箱</label>
+        <input type="email" id="email" name="email" placeholder="请输入邮箱" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="password">密码</label>
+        <input type="password" id="password" name="password" placeholder="请输入密码" required>
+      </div>
+      
+      <button type="submit" class="submit-btn">登录</button>
+    </form>
+    
+    <div class="login-footer">
+      <p>请使用管理员账号登录，普通用户无法访问管理后台</p>
+      <p>如果忘记密码，请联系超级管理员</p>
+    </div>
+  </div>
+  
+  <script src="js/admin.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // 检查是否已登录
+      const token = localStorage.getItem('adminToken');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.exp && payload.exp * 1000 > Date.now()) {
+            // Token有效，重定向到管理后台首页
+            window.location.href = 'index.html';
+            return;
+          }
+        } catch (error) {
+          // 无效的token，清除并继续登录
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUsername');
+        }
+      }
+      
+      const loginForm = document.getElementById('login-form');
+      const errorMessage = document.getElementById('error-message');
+      
+      loginForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        
+        // 清除错误信息
+        errorMessage.style.display = 'none';
+        
+        try {
+          // 先登录获取普通用户token
+          const loginResponse = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+          });
+          
+          const loginData = await loginResponse.json();
+          
+          if (!loginResponse.ok) {
+            throw new Error(loginData.message || '登录失败');
+          }
+          
+          // 使用普通用户token验证是否为管理员
+          const adminResponse = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${loginData.token || document.cookie.replace(/(?:(?:^|.*;\s*)token\s*\=\s*([^;]*).*$)|^.*$/, "$1")}`
+            }
+          });
+          
+          const adminData = await adminResponse.json();
+          
+          if (!adminResponse.ok || !adminData.success) {
+            throw new Error(adminData.message || '没有管理员权限');
+          }
+          
+          // 保存管理员token和用户名
+          localStorage.setItem('adminToken', loginData.token || document.cookie.replace(/(?:(?:^|.*;\s*)token\s*\=\s*([^;]*).*$)|^.*$/, "$1"));
+          localStorage.setItem('adminUsername', adminData.admin.username);
+          
+          // 重定向到管理后台首页
+          window.location.href = 'index.html';
+          
+        } catch (error) {
+          // 显示错误信息
+          errorMessage.textContent = error.message || '登录失败，请检查邮箱和密码';
+          errorMessage.style.display = 'block';
+          console.error('登录错误:', error);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

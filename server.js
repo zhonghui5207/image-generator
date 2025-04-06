@@ -18,6 +18,7 @@ import creditRoutes from './routes/creditRoutes.js';
 import imageHistoryRoutes from './routes/imageHistoryRoutes.js';
 import smsRoutes from './routes/smsRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 // 导入中间件和工具
 import { authenticate, checkCredits } from './utils/auth.js';
@@ -180,6 +181,7 @@ app.use('/api/credits', creditRoutes);
 app.use('/api/history', imageHistoryRoutes);
 app.use('/api/sms', smsRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Helper function to convert image to base64
 function image2Base64(imagePath) {

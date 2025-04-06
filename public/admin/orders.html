@@ -216,7 +216,7 @@
       const filterBtn = document.getElementById('filterBtn');
       const ordersTableBody = document.getElementById('ordersTableBody');
       const paginationContainer = document.getElementById('paginationContainer');
-      const logoutBtn = document.getElementById('logoutBtn');
+      const logoutBtn = document.getElementById('logout-btn');
       
       const todayOrderCountEl = document.getElementById('todayOrderCount');
       const todayRevenueEl = document.getElementById('todayRevenue');
@@ -234,10 +234,10 @@
             monthOrderCountEl.textContent = response.stats.monthCount;
             monthRevenueEl.textContent = adminUtils.formatCurrency(response.stats.monthRevenue);
           } else {
-            adminUtils.showAlert(response.message || '加载订单统计数据失败', 'error');
+            showNotification(response.message || '加载订单统计数据失败', 'error');
           }
         } catch (error) {
-          adminUtils.showAlert('加载订单统计数据时发生错误', 'error');
+          showNotification('加载订单统计数据时发生错误', 'error');
           console.error('加载订单统计数据错误:', error);
         }
       }
@@ -248,500 +248,318 @@
           const params = new URLSearchParams({
             page: currentPage,
             limit: PAGE_SIZE,
+            search: searchTerm,
             status: statusFilter,
-            paymentMethod: paymentMethodFilter
+            paymentMethod: paymentMethodFilter,
+            startDate: startDate,
+            endDate: endDate
           });
           
-          if (searchTerm) {
-            params.append('search', searchTerm);
-          }
-          
-          if (startDate) {
-            params.append('startDate', startDate);
-          }
-          
-          if (endDate) {
-            params.append('endDate', endDate);
-          }
+          // 显示加载状态
+          ordersTableBody.innerHTML = '<tr><td colspan="9" class="text-center">加载中...</td></tr>';
           
           const response = await adminUtils.apiRequest(`/api/admin/orders?${params.toString()}`);
           
           if (response && response.success) {
             // 更新分页信息
-            totalPages = Math.ceil(response.total / PAGE_SIZE);
-            renderPagination();
+            totalPages = response.pagination.totalPages;
             
-            // 渲染订单列表
-            renderOrderList(response.orders);
+            // 清空表格
+            ordersTableBody.innerHTML = '';
+            
+            // 如果没有数据，显示提示
+            if (response.orders.length === 0) {
+              ordersTableBody.innerHTML = '<tr><td colspan="9" class="text-center">暂无订单数据</td></tr>';
+              return;
+            }
+            
+            // 渲染订单数据
+            response.orders.forEach(order => {
+              const row = document.createElement('tr');
+              
+              // 订单状态类和文本
+              let statusClass = '';
+              let statusText = '';
+              
+              switch (order.status) {
+                case 'pending':
+                  statusClass = 'status-pending';
+                  statusText = '待支付';
+                  break;
+                case 'paid':
+                  statusClass = 'status-success';
+                  statusText = '已支付';
+                  break;
+                case 'cancelled':
+                  statusClass = 'status-cancelled';
+                  statusText = '已取消';
+                  break;
+                case 'refunded':
+                  statusClass = 'status-warning';
+                  statusText = '已退款';
+                  break;
+                default:
+                  statusClass = 'status-default';
+                  statusText = order.status;
+              }
+              
+              // 支付方式文本
+              let paymentMethodText = '';
+              switch (order.paymentMethod) {
+                case 'wechat':
+                  paymentMethodText = '微信支付';
+                  break;
+                case 'alipay':
+                  paymentMethodText = '支付宝';
+                  break;
+                case 'payjs':
+                  paymentMethodText = 'PayJS';
+                  break;
+                case 'manual':
+                  paymentMethodText = '手动充值';
+                  break;
+                default:
+                  paymentMethodText = order.paymentMethod || '未知';
+              }
+              
+              // 商品名称
+              const productName = order.packageName || '积分充值';
+              
+              // 拼接行内容
+              row.innerHTML = `
+                <td>${adminUtils.escapeHtml(order.orderNumber)}</td>
+                <td>${order.user ? adminUtils.escapeHtml(order.user.username) : '未知用户'}</td>
+                <td>${adminUtils.escapeHtml(productName)}</td>
+                <td>${adminUtils.formatCurrency(order.amount)}</td>
+                <td>${order.credits}</td>
+                <td>${adminUtils.escapeHtml(paymentMethodText)}</td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td>${adminUtils.formatDateTime(order.createdAt)}</td>
+                <td>
+                  <div class="actions">
+                    <button class="action-btn view-btn" data-id="${order._id}" title="查看详情">
+                      <i class="fas fa-eye"></i>
+                    </button>
+                    ${order.status === 'pending' ? `
+                      <button class="action-btn approve-btn" data-id="${order._id}" title="标记为已支付">
+                        <i class="fas fa-check"></i>
+                      </button>
+                      <button class="action-btn cancel-btn" data-id="${order._id}" title="取消订单">
+                        <i class="fas fa-times"></i>
+                      </button>
+                    ` : ''}
+                    ${order.status === 'paid' ? `
+                      <button class="action-btn refund-btn" data-id="${order._id}" title="退款">
+                        <i class="fas fa-undo"></i>
+                      </button>
+                    ` : ''}
+                  </div>
+                </td>
+              `;
+              
+              ordersTableBody.appendChild(row);
+            });
+            
+            // 添加事件监听器
+            attachOrderActionListeners();
+            
+            // 更新分页
+            updatePagination();
+            
           } else {
-            adminUtils.showAlert(response.message || '加载订单数据失败', 'error');
+            showNotification(response.message || '加载订单数据失败', 'error');
           }
         } catch (error) {
-          adminUtils.showAlert('加载订单数据时发生错误', 'error');
+          showNotification('加载订单数据时发生错误', 'error');
           console.error('加载订单数据错误:', error);
         }
       }
       
-      // 渲染订单列表
-      function renderOrderList(orders) {
-        // 清空表格
-        ordersTableBody.innerHTML = '';
-        
-        if (orders.length === 0) {
-          const emptyRow = document.createElement('tr');
-          const emptyCell = document.createElement('td');
-          emptyCell.colSpan = 9;
-          emptyCell.textContent = '没有找到订单数据';
-          emptyCell.className = 'empty-table-message';
-          emptyRow.appendChild(emptyCell);
-          ordersTableBody.appendChild(emptyRow);
-          return;
-        }
-        
-        // 添加订单行
-        orders.forEach(order => {
-          const row = document.createElement('tr');
-          
-          // 订单号
-          const orderIdCell = document.createElement('td');
-          orderIdCell.textContent = order.orderNumber;
-          row.appendChild(orderIdCell);
-          
-          // 用户
-          const userCell = document.createElement('td');
-          userCell.textContent = order.user ? order.user.username : '未知用户';
-          row.appendChild(userCell);
-          
-          // 商品
-          const productCell = document.createElement('td');
-          productCell.textContent = order.productName || '积分充值';
-          row.appendChild(productCell);
-          
-          // 金额
-          const amountCell = document.createElement('td');
-          amountCell.textContent = adminUtils.formatCurrency(order.amount);
-          row.appendChild(amountCell);
-          
-          // 积分
-          const creditsCell = document.createElement('td');
-          creditsCell.textContent = order.credits;
-          row.appendChild(creditsCell);
-          
-          // 支付方式
-          const paymentMethodCell = document.createElement('td');
-          
-          switch (order.paymentMethod) {
-            case 'wechat':
-              paymentMethodCell.textContent = '微信支付';
-              break;
-            case 'alipay':
-              paymentMethodCell.textContent = '支付宝';
-              break;
-            case 'payjs':
-              paymentMethodCell.textContent = 'PayJS';
-              break;
-            case 'manual':
-              paymentMethodCell.textContent = '手动充值';
-              break;
-            default:
-              paymentMethodCell.textContent = order.paymentMethod || '未知';
-          }
-          
-          row.appendChild(paymentMethodCell);
-          
-          // 状态
-          const statusCell = document.createElement('td');
-          const statusBadge = document.createElement('span');
-          statusBadge.className = 'badge';
-          
-          switch (order.status) {
-            case 'pending':
-              statusBadge.textContent = '待支付';
-              statusBadge.classList.add('badge-warning');
-              break;
-            case 'paid':
-              statusBadge.textContent = '已支付';
-              statusBadge.classList.add('badge-success');
-              break;
-            case 'cancelled':
-              statusBadge.textContent = '已取消';
-              statusBadge.classList.add('badge-secondary');
-              break;
-            case 'refunded':
-              statusBadge.textContent = '已退款';
-              statusBadge.classList.add('badge-danger');
-              break;
-            default:
-              statusBadge.textContent = order.status || '未知';
-              statusBadge.classList.add('badge-secondary');
-          }
-          
-          statusCell.appendChild(statusBadge);
-          row.appendChild(statusCell);
-          
-          // 创建时间
-          const createdAtCell = document.createElement('td');
-          createdAtCell.textContent = adminUtils.formatDateTime(order.createdAt);
-          row.appendChild(createdAtCell);
-          
-          // 操作
-          const actionsCell = document.createElement('td');
-          actionsCell.className = 'actions-cell';
-          
-          // 查看详情按钮
-          const viewBtn = document.createElement('button');
-          viewBtn.className = 'btn btn-sm btn-primary';
-          viewBtn.innerHTML = '<i class="fas fa-eye"></i>';
-          viewBtn.title = '查看详情';
-          viewBtn.addEventListener('click', () => viewOrderDetails(order._id));
-          actionsCell.appendChild(viewBtn);
-          
-          // 根据订单状态显示不同的操作按钮
-          if (order.status === 'pending') {
-            // 手动标记为已支付按钮
-            const markPaidBtn = document.createElement('button');
-            markPaidBtn.className = 'btn btn-sm btn-success';
-            markPaidBtn.innerHTML = '<i class="fas fa-check"></i>';
-            markPaidBtn.title = '标记为已支付';
-            markPaidBtn.addEventListener('click', () => updateOrderStatus(order._id, 'paid'));
-            actionsCell.appendChild(markPaidBtn);
-            
-            // 取消订单按钮
-            const cancelBtn = document.createElement('button');
-            cancelBtn.className = 'btn btn-sm btn-danger';
-            cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
-            cancelBtn.title = '取消订单';
-            cancelBtn.addEventListener('click', () => updateOrderStatus(order._id, 'cancelled'));
-            actionsCell.appendChild(cancelBtn);
-          } else if (order.status === 'paid') {
-            // 退款按钮
-            const refundBtn = document.createElement('button');
-            refundBtn.className = 'btn btn-sm btn-warning';
-            refundBtn.innerHTML = '<i class="fas fa-undo"></i>';
-            refundBtn.title = '退款';
-            refundBtn.addEventListener('click', () => processRefund(order._id));
-            actionsCell.appendChild(refundBtn);
-          }
-          
-          row.appendChild(actionsCell);
-          ordersTableBody.appendChild(row);
-        });
-      }
-      
-      // 渲染分页
-      function renderPagination() {
-        // 清空分页容器
+      // 更新分页控件
+      function updatePagination() {
         paginationContainer.innerHTML = '';
         
         if (totalPages <= 1) return;
         
-        // 创建分页
-        const pagination = adminUtils.createPagination(currentPage, totalPages, (page) => {
-          currentPage = page;
-          loadOrders();
+        const pagination = document.createElement('div');
+        pagination.className = 'pagination';
+        
+        // 上一页按钮
+        const prevButton = document.createElement('button');
+        prevButton.className = 'pagination-btn prev-btn';
+        prevButton.disabled = currentPage === 1;
+        prevButton.innerHTML = '<i class="fas fa-chevron-left"></i>';
+        prevButton.addEventListener('click', () => {
+          if (currentPage > 1) {
+            currentPage--;
+            loadOrders();
+          }
         });
+        
+        // 下一页按钮
+        const nextButton = document.createElement('button');
+        nextButton.className = 'pagination-btn next-btn';
+        nextButton.disabled = currentPage === totalPages;
+        nextButton.innerHTML = '<i class="fas fa-chevron-right"></i>';
+        nextButton.addEventListener('click', () => {
+          if (currentPage < totalPages) {
+            currentPage++;
+            loadOrders();
+          }
+        });
+        
+        // 页码按钮
+        const pageButtons = document.createElement('div');
+        pageButtons.className = 'page-buttons';
+        
+        // 确定要显示哪些页码按钮
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        
+        if (endPage - startPage < 4) {
+          startPage = Math.max(1, endPage - 4);
+        }
+        
+        // 添加第一页按钮
+        if (startPage > 1) {
+          const firstPageButton = document.createElement('button');
+          firstPageButton.className = 'pagination-btn';
+          firstPageButton.textContent = '1';
+          firstPageButton.addEventListener('click', () => {
+            currentPage = 1;
+            loadOrders();
+          });
+          pageButtons.appendChild(firstPageButton);
+          
+          if (startPage > 2) {
+            const ellipsis = document.createElement('span');
+            ellipsis.className = 'pagination-ellipsis';
+            ellipsis.textContent = '...';
+            pageButtons.appendChild(ellipsis);
+          }
+        }
+        
+        // 添加页码按钮
+        for (let i = startPage; i <= endPage; i++) {
+          const pageButton = document.createElement('button');
+          pageButton.className = `pagination-btn ${i === currentPage ? 'active' : ''}`;
+          pageButton.textContent = i;
+          pageButton.addEventListener('click', () => {
+            currentPage = i;
+            loadOrders();
+          });
+          pageButtons.appendChild(pageButton);
+        }
+        
+        // 添加最后一页按钮
+        if (endPage < totalPages) {
+          if (endPage < totalPages - 1) {
+            const ellipsis = document.createElement('span');
+            ellipsis.className = 'pagination-ellipsis';
+            ellipsis.textContent = '...';
+            pageButtons.appendChild(ellipsis);
+          }
+          
+          const lastPageButton = document.createElement('button');
+          lastPageButton.className = 'pagination-btn';
+          lastPageButton.textContent = totalPages;
+          lastPageButton.addEventListener('click', () => {
+            currentPage = totalPages;
+            loadOrders();
+          });
+          pageButtons.appendChild(lastPageButton);
+        }
+        
+        // 组合分页控件
+        pagination.appendChild(prevButton);
+        pagination.appendChild(pageButtons);
+        pagination.appendChild(nextButton);
         
         paginationContainer.appendChild(pagination);
       }
       
-      // 查看订单详情
-      async function viewOrderDetails(orderId) {
-        try {
-          const response = await adminUtils.apiRequest(`/api/admin/orders/${orderId}`);
-          
-          if (response && response.success) {
-            // 创建详情模态框显示订单详细信息
-            const order = response.order;
-            
-            const detailsHtml = `
-              <div class="order-details">
-                <div class="details-row">
-                  <div class="details-label">订单号：</div>
-                  <div class="details-value">${order.orderNumber}</div>
-                </div>
-                <div class="details-row">
-                  <div class="details-label">用户：</div>
-                  <div class="details-value">${order.user ? order.user.username : '未知用户'}</div>
-                </div>
-                <div class="details-row">
-                  <div class="details-label">商品：</div>
-                  <div class="details-value">${order.productName || '积分充值'}</div>
-                </div>
-                <div class="details-row">
-                  <div class="details-label">金额：</div>
-                  <div class="details-value">${adminUtils.formatCurrency(order.amount)}</div>
-                </div>
-                <div class="details-row">
-                  <div class="details-label">积分：</div>
-                  <div class="details-value">${order.credits}</div>
-                </div>
-                <div class="details-row">
-                  <div class="details-label">支付方式：</div>
-                  <div class="details-value">${getPaymentMethodText(order.paymentMethod)}</div>
-                </div>
-                <div class="details-row">
-                  <div class="details-label">状态：</div>
-                  <div class="details-value">${getStatusText(order.status)}</div>
-                </div>
-                <div class="details-row">
-                  <div class="details-label">创建时间：</div>
-                  <div class="details-value">${adminUtils.formatDateTime(order.createdAt)}</div>
-                </div>
-                ${order.paidAt ? `
-                <div class="details-row">
-                  <div class="details-label">支付时间：</div>
-                  <div class="details-value">${adminUtils.formatDateTime(order.paidAt)}</div>
-                </div>
-                ` : ''}
-                ${order.transactionId ? `
-                <div class="details-row">
-                  <div class="details-label">交易ID：</div>
-                  <div class="details-value">${order.transactionId}</div>
-                </div>
-                ` : ''}
-                ${order.refundReason ? `
-                <div class="details-row">
-                  <div class="details-label">退款原因：</div>
-                  <div class="details-value">${order.refundReason}</div>
-                </div>
-                ` : ''}
-                ${order.notes ? `
-                <div class="details-row">
-                  <div class="details-label">备注：</div>
-                  <div class="details-value">${order.notes}</div>
-                </div>
-                ` : ''}
-              </div>
-            `;
-            
-            // 创建模态框
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.display = 'flex';
-            
-            // 创建模态框内容
-            const modalContent = document.createElement('div');
-            modalContent.className = 'modal-content';
-            
-            // 创建模态框头部
-            const modalHeader = document.createElement('div');
-            modalHeader.className = 'modal-header';
-            
-            const modalTitle = document.createElement('h3');
-            modalTitle.className = 'modal-title';
-            modalTitle.textContent = '订单详情';
-            
-            const closeBtn = document.createElement('button');
-            closeBtn.className = 'modal-close';
-            closeBtn.innerHTML = '&times;';
-            closeBtn.addEventListener('click', () => {
-              modal.remove();
-            });
-            
-            modalHeader.appendChild(modalTitle);
-            modalHeader.appendChild(closeBtn);
-            
-            // 创建模态框主体
-            const modalBody = document.createElement('div');
-            modalBody.className = 'modal-body';
-            modalBody.innerHTML = detailsHtml;
-            
-            // 组装模态框
-            modalContent.appendChild(modalHeader);
-            modalContent.appendChild(modalBody);
-            modal.appendChild(modalContent);
-            
-            // 添加到文档
-            document.body.appendChild(modal);
-            
-            // 点击模态框外部关闭
-            modal.addEventListener('click', (e) => {
-              if (e.target === modal) {
-                modal.remove();
-              }
-            });
-          } else {
-            adminUtils.showAlert(response.message || '获取订单详情失败', 'error');
-          }
-        } catch (error) {
-          adminUtils.showAlert('获取订单详情时发生错误', 'error');
-          console.error('获取订单详情错误:', error);
-        }
-      }
-      
-      // 更新订单状态
-      function updateOrderStatus(orderId, newStatus) {
-        const statusText = getStatusActionText(newStatus);
+      // 添加订单操作按钮的事件监听器
+      function attachOrderActionListeners() {
+        // 查看订单详情按钮
+        document.querySelectorAll('.view-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const orderId = btn.getAttribute('data-id');
+            // TODO: 实现查看订单详情的功能
+            alert('查看订单详情，ID: ' + orderId);
+          });
+        });
         
-        adminUtils.createConfirmDialog(
-          `确定要将此订单${statusText}吗？`,
-          async () => {
-            try {
-              const response = await adminUtils.apiRequest(`/api/admin/orders/${orderId}/status`, 'PUT', { status: newStatus });
-              
-              if (response && response.success) {
-                adminUtils.showAlert(`订单已成功${statusText}`);
-                loadOrders();
-                loadOrderStats();
-              } else {
-                adminUtils.showAlert(response.message || `${statusText}订单失败`, 'error');
-              }
-            } catch (error) {
-              adminUtils.showAlert(`${statusText}订单时发生错误`, 'error');
-              console.error(`${statusText}订单错误:`, error);
+        // 标记为已支付按钮
+        document.querySelectorAll('.approve-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const orderId = btn.getAttribute('data-id');
+            if (confirm('确定要将此订单标记为已支付吗？')) {
+              // TODO: 实现标记为已支付的功能
+              alert('标记为已支付，ID: ' + orderId);
             }
-          }
-        );
-      }
-      
-      // 处理退款
-      function processRefund(orderId) {
-        const fields = [
-          {
-            id: 'reason',
-            label: '退款原因',
-            type: 'textarea',
-            required: true,
-            rows: 3
-          }
-        ];
+          });
+        });
         
-        adminUtils.createFormDialog(
-          '处理退款',
-          fields,
-          async (formData, closeModal) => {
-            try {
-              const response = await adminUtils.apiRequest(`/api/admin/orders/${orderId}/refund`, 'POST', formData);
-              
-              if (response && response.success) {
-                adminUtils.showAlert('退款处理成功');
-                loadOrders();
-                loadOrderStats();
-                closeModal();
-              } else {
-                adminUtils.showAlert(response.message || '退款处理失败', 'error');
-              }
-            } catch (error) {
-              adminUtils.showAlert('退款处理时发生错误', 'error');
-              console.error('退款处理错误:', error);
+        // 取消订单按钮
+        document.querySelectorAll('.cancel-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const orderId = btn.getAttribute('data-id');
+            if (confirm('确定要取消此订单吗？')) {
+              // TODO: 实现取消订单的功能
+              alert('取消订单，ID: ' + orderId);
             }
-          }
-        );
+          });
+        });
+        
+        // 退款按钮
+        document.querySelectorAll('.refund-btn').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const orderId = btn.getAttribute('data-id');
+            if (confirm('确定要对此订单进行退款吗？')) {
+              // TODO: 实现退款的功能
+              alert('退款，ID: ' + orderId);
+            }
+          });
+        });
       }
       
-      // 获取支付方式显示文本
-      function getPaymentMethodText(method) {
-        switch (method) {
-          case 'wechat': return '微信支付';
-          case 'alipay': return '支付宝';
-          case 'payjs': return 'PayJS';
-          case 'manual': return '手动充值';
-          default: return method || '未知';
-        }
-      }
-      
-      // 获取状态显示文本
-      function getStatusText(status) {
-        switch (status) {
-          case 'pending': return '待支付';
-          case 'paid': return '已支付';
-          case 'cancelled': return '已取消';
-          case 'refunded': return '已退款';
-          default: return status || '未知';
-        }
-      }
-      
-      // 获取状态操作文本
-      function getStatusActionText(status) {
-        switch (status) {
-          case 'paid': return '标记为已支付';
-          case 'cancelled': return '取消';
-          case 'refunded': return '退款';
-          default: return '更新状态';
-        }
-      }
-      
-      // 搜索订单
-      function searchOrders() {
+      // 绑定搜索和筛选事件
+      searchBtn.addEventListener('click', () => {
         searchTerm = searchInput.value.trim();
         currentPage = 1;
         loadOrders();
-      }
+      });
       
-      // 过滤订单
-      function filterOrders() {
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          searchTerm = searchInput.value.trim();
+          currentPage = 1;
+          loadOrders();
+        }
+      });
+      
+      filterBtn.addEventListener('click', () => {
         statusFilter = statusFilterSelect.value;
         paymentMethodFilter = paymentMethodFilterSelect.value;
         startDate = startDateInput.value;
         endDate = endDateInput.value;
         currentPage = 1;
         loadOrders();
+      });
+      
+      // 绑定退出登录按钮
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('adminUsername');
+          window.location.href = 'login.html';
+        });
       }
       
-      // 退出登录
-      function logout() {
-        localStorage.removeItem('adminToken');
-        window.location.href = '/admin/login.html';
-      }
-      
-      // 事件监听
-      searchBtn.addEventListener('click', searchOrders);
-      searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') searchOrders();
-      });
-      filterBtn.addEventListener('click', filterOrders);
-      logoutBtn.addEventListener('click', logout);
-      
-      // 显示用户下拉菜单
-      const dropdownBtn = document.querySelector('.dropdown-btn');
-      dropdownBtn.addEventListener('click', function() {
-        document.querySelector('.dropdown-content').classList.toggle('show');
-      });
-      
-      // 点击其他地方关闭下拉菜单
-      window.addEventListener('click', function(e) {
-        if (!e.target.matches('.dropdown-btn') && !e.target.matches('.fa-chevron-down')) {
-          const dropdowns = document.querySelectorAll('.dropdown-content');
-          dropdowns.forEach(dropdown => {
-            if (dropdown.classList.contains('show')) {
-              dropdown.classList.remove('show');
-            }
-          });
-        }
-      });
-      
-      // 设置默认日期范围（最近30天）
-      const today = new Date();
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(today.getDate() - 30);
-      
-      endDateInput.valueAsDate = today;
-      startDateInput.valueAsDate = thirtyDaysAgo;
-      
-      // 初始加载
+      // 初始加载数据
       loadOrderStats();
       loadOrders();
-      
-      // 添加侧边栏切换事件
-      document.getElementById('toggle-sidebar').addEventListener('click', function() {
-        document.getElementById('sidebar').classList.toggle('collapsed');
-        document.querySelector('.main-content').classList.toggle('expanded');
-      });
-      
-      // 添加用户菜单切换事件
-      document.getElementById('user-menu-btn').addEventListener('click', function() {
-        document.getElementById('user-dropdown').classList.toggle('show');
-      });
-      
-      // 点击页面其他地方关闭下拉菜单
-      window.addEventListener('click', function(e) {
-        if (!e.target.matches('.user-menu-btn') && !e.target.parentNode.matches('.user-menu-btn')) {
-          const dropdown = document.getElementById('user-dropdown');
-          if (dropdown.classList.contains('show')) {
-            dropdown.classList.remove('show');
-          }
-        }
-      });
     });
   </script>
 
