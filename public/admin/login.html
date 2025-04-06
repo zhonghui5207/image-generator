@@ -18,8 +18,8 @@
     
     <form id="login-form" class="login-form">
       <div class="form-group">
-        <label for="email">邮箱</label>
-        <input type="email" id="email" name="email" placeholder="请输入邮箱" required>
+        <label for="email">用户名</label>
+        <input type="text" id="email" name="email" placeholder="请输入用户名" required>
       </div>
       
       <div class="form-group">
@@ -112,7 +112,7 @@
           
         } catch (error) {
           // 显示错误信息
-          errorMessage.textContent = error.message || '登录失败，请检查邮箱和密码';
+          errorMessage.textContent = error.message || '登录失败，请检查用户名和密码';
           errorMessage.style.display = 'block';
           console.error('登录错误:', error);
         }
