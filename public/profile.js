@@ -231,6 +231,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // 加载生成历史
   async function loadGenerationHistory() {
     try {
+      // 显示加载中状态
+      historyGrid.innerHTML = '<div class="empty-history">加载中...</div>';
+      
       // 构建查询参数
       const params = new URLSearchParams({
         page: currentPage,
@@ -250,6 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 更新总页数
         totalPages = Math.ceil(data.total / itemsPerPage);
+        console.log(`总记录数: ${data.total}, 每页显示: ${itemsPerPage}, 总页数: ${totalPages}`);
         
         // 渲染历史记录
         renderHistory(data.images);
@@ -337,12 +341,20 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 渲染分页
   function renderPagination() {
-    if (!pagination) return;
+    if (!pagination) {
+      console.error('分页容器不存在');
+      return;
+    }
     
     // 清空现有内容
     pagination.innerHTML = '';
     
-    if (totalPages <= 1) return;
+    if (totalPages <= 1) {
+      console.log('总页数小于等于1，不显示分页');
+      return;
+    }
+    
+    console.log(`渲染分页控件: 当前页 ${currentPage}, 总页数 ${totalPages}`);
     
     // 上一页按钮
     const prevBtn = document.createElement('button');
@@ -392,6 +404,12 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
     pagination.appendChild(nextBtn);
+    
+    // 添加页码信息
+    const pageInfo = document.createElement('div');
+    pageInfo.className = 'page-info';
+    pageInfo.textContent = `第 ${currentPage} 页，共 ${totalPages} 页`;
+    pagination.appendChild(pageInfo);
   }
   
   // 显示图像详情
@@ -1172,6 +1190,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(bindAllDownloadButtons, 500);
     return result;
   };
+  
+  // 确保在页面加载完成后初始化生成历史
+  loadGenerationHistory();
   
   // 初始绑定所有下载按钮
   bindAllDownloadButtons();
