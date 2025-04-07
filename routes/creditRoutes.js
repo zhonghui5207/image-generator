@@ -56,19 +56,37 @@ router.get('/purchases', authenticate, async (req, res) => {
   }
 });
 
-// 获取用户积分使用记录
+// 获取用户积分使用记录（带分页）
 router.get('/usage-history', authenticate, async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    // 查询记录总数
+    const total = await CreditTransaction.countDocuments({ 
+      user: req.user._id,
+      type: 'usage'
+    });
+    
+    // 获取分页数据
     const records = await CreditTransaction.find({ 
       user: req.user._id,
       type: 'usage'
     })
       .sort({ createdAt: -1 })
-      .limit(20);
+      .skip(skip)
+      .limit(limit);
     
     res.json({
       success: true,
-      records
+      records,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
     });
   } catch (error) {
     console.error('获取积分使用记录错误:', error);

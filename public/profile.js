@@ -805,6 +805,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
+  // 积分使用记录分页变量
+  let creditCurrentPage = 1;
+  const creditItemsPerPage = 10;
+  let creditTotalPages = 1;
+  
   // 加载积分使用记录
   async function loadCreditsUsageHistory() {
     if (!usageList) return;
@@ -813,8 +818,14 @@ document.addEventListener('DOMContentLoaded', function() {
       // 显示加载中状态
       usageList.innerHTML = '<p class="loading-message"><i class="fas fa-spinner fa-spin"></i> 正在加载使用记录...</p>';
       
+      // 构建查询参数
+      const params = new URLSearchParams({
+        page: creditCurrentPage,
+        limit: creditItemsPerPage
+      });
+      
       // 尝试从服务器获取数据 - 确保获取的是使用记录而非购买记录
-      const response = await fetch('/api/credits/usage-history', {
+      const response = await fetch(`/api/credits/usage-history?${params}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -824,8 +835,16 @@ document.addEventListener('DOMContentLoaded', function() {
       if (response.ok) {
         const data = await response.json();
         
+        // 更新总页数
+        if (data.pagination) {
+          creditTotalPages = data.pagination.pages;
+        }
+        
         if (data.records && data.records.length > 0) {
           displayUsageRecords(data.records);
+          
+          // 渲染积分使用记录的分页
+          renderCreditsPagination();
         } else {
           // 没有记录，显示空状态
           usageList.innerHTML = '<p class="empty-list">暂无使用记录</p>';
@@ -839,6 +858,72 @@ document.addEventListener('DOMContentLoaded', function() {
       // 发生错误，显示错误状态
       usageList.innerHTML = '<p class="empty-list">加载使用记录时出错</p>';
     }
+  }
+  
+  // 渲染积分使用记录的分页
+  function renderCreditsPagination() {
+    // 创建分页容器（如果不存在）
+    let creditsPagination = document.getElementById('credits-pagination');
+    if (!creditsPagination) {
+      creditsPagination = document.createElement('div');
+      creditsPagination.id = 'credits-pagination';
+      creditsPagination.className = 'pagination';
+      usageList.parentNode.appendChild(creditsPagination);
+    } else {
+      // 清空现有内容
+      creditsPagination.innerHTML = '';
+    }
+    
+    if (creditTotalPages <= 1) return;
+    
+    // 上一页按钮
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'pagination-btn';
+    prevBtn.textContent = '上一页';
+    prevBtn.disabled = creditCurrentPage === 1;
+    prevBtn.addEventListener('click', () => {
+      if (creditCurrentPage > 1) {
+        creditCurrentPage--;
+        loadCreditsUsageHistory();
+      }
+    });
+    creditsPagination.appendChild(prevBtn);
+    
+    // 页码按钮
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, creditCurrentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(creditTotalPages, startPage + maxVisiblePages - 1);
+    
+    // 调整起始页码
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      const pageBtn = document.createElement('button');
+      pageBtn.className = 'pagination-btn' + (i === creditCurrentPage ? ' active' : '');
+      pageBtn.textContent = i;
+      pageBtn.addEventListener('click', () => {
+        if (i !== creditCurrentPage) {
+          creditCurrentPage = i;
+          loadCreditsUsageHistory();
+        }
+      });
+      creditsPagination.appendChild(pageBtn);
+    }
+    
+    // 下一页按钮
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'pagination-btn';
+    nextBtn.textContent = '下一页';
+    nextBtn.disabled = creditCurrentPage === creditTotalPages;
+    nextBtn.addEventListener('click', () => {
+      if (creditCurrentPage < creditTotalPages) {
+        creditCurrentPage++;
+        loadCreditsUsageHistory();
+      }
+    });
+    creditsPagination.appendChild(nextBtn);
   }
   
   // 显示积分使用记录
@@ -857,9 +942,26 @@ document.addEventListener('DOMContentLoaded', function() {
       // 提取模型名称和实际消耗的积分
       let creditsUsed = Math.abs(record.amount);
       
+      // 处理描述文本，将模型名称转换为友好的显示名称
+      let description = record.description || '生成图像';
+      
+      // 检查描述中是否包含模型名称
+      const modelRegex = /\(([^)]+)\)/;
+      const modelMatch = description.match(modelRegex);
+      
+      if (modelMatch && modelMatch[1]) {
+        const modelName = modelMatch[1];
+        const displayName = getModelDisplayName(modelName);
+        
+        // 替换描述中的模型名称
+        if (displayName !== modelName) {
+          description = description.replace(`(${modelName})`, `(${displayName})`);
+        }
+      }
+      
       item.innerHTML = `
         <div class="transaction-date">${date}</div>
-        <div class="transaction-details">${record.description || '生成图像'}</div>
+        <div class="transaction-details">${description}</div>
         <div class="transaction-amount negative">-${creditsUsed} 积分</div>
       `;
       
