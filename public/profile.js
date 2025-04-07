@@ -37,9 +37,14 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 分页变量
   let currentPage = 1;
-  const itemsPerPage = 12;
+  const itemsPerPage = 4; // 每页显示4个图像
   let totalPages = 1;
   let sortOrder = 'newest';
+  
+  // 积分使用记录分页变量
+  let creditCurrentPage = 1;
+  const creditItemsPerPage = 10;
+  let creditTotalPages = 1;
   
   // 用户信息
   let user = JSON.parse(localStorage.getItem('user') || 'null');
@@ -274,44 +279,22 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 渲染历史记录
   function renderHistory(images) {
+    if (!historyGrid) return;
+    
     // 清空现有内容
     historyGrid.innerHTML = '';
     
-    if (images && images.length > 0) {
-      images.forEach(image => {
-        const historyItem = document.createElement('div');
-        historyItem.className = 'history-item';
-        
-        // 判断是否为文生图模式
-        const isTextToImage = image.mode === 'text-to-image';
-        
-        // 格式化日期
-        const date = new Date(image.createdAt).toLocaleDateString();
-        
-        // 根据模式添加不同的标识
-        const modeLabel = isTextToImage ? 
-          '<div class="mode-label text-mode"><i class="fas fa-font"></i> 文生图</div>' : 
-          '<div class="mode-label image-mode"><i class="fas fa-image"></i> 图生图</div>';
-        
-        historyItem.innerHTML = `
-          <div class="history-image">
-            <img src="${image.generatedImage}" alt="生成图像">
-            ${modeLabel}
-          </div>
-          <div class="history-details">
-            <div class="history-date">${date}</div>
-            <div class="history-prompt">${truncateText(image.prompt, 30)}</div>
-          </div>
-        `;
-        
-        // 点击查看详情
-        historyItem.addEventListener('click', () => showImageDetails(image));
-        
-        historyGrid.appendChild(historyItem);
-      });
-      
-      // 添加模式标签的样式
+    if (!images || images.length === 0) {
+      historyGrid.innerHTML = '<div class="empty-history">暂无生成历史</div>';
+      return;
+    }
+    
+    console.log(`渲染历史记录: 显示 ${images.length} 个图像`);
+    
+    // 添加模式标签的样式（如果尚未添加）
+    if (!document.getElementById('mode-label-styles')) {
       const style = document.createElement('style');
+      style.id = 'mode-label-styles';
       style.textContent = `
         .mode-label {
           position: absolute;
@@ -334,9 +317,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       `;
       document.head.appendChild(style);
-    } else {
-      historyGrid.innerHTML = '<div class="empty-history">暂无生成历史</div>';
     }
+    
+    // 渲染每个图像
+    images.forEach(image => {
+      const historyItem = document.createElement('div');
+      historyItem.className = 'history-item';
+      
+      // 判断是否为文生图模式
+      const isTextToImage = image.mode === 'text-to-image';
+      
+      // 格式化日期
+      const date = new Date(image.createdAt).toLocaleDateString();
+      
+      // 根据模式添加不同的标识
+      const modeLabel = isTextToImage ? 
+        '<div class="mode-label text-mode"><i class="fas fa-font"></i> 文生图</div>' : 
+        '<div class="mode-label image-mode"><i class="fas fa-image"></i> 图生图</div>';
+      
+      historyItem.innerHTML = `
+        <div class="history-image">
+          <img src="${image.generatedImage}" alt="生成图像">
+          ${modeLabel}
+        </div>
+        <div class="history-details">
+          <div class="history-date">${date}</div>
+          <div class="history-prompt">${truncateText(image.prompt, 30)}</div>
+        </div>
+      `;
+      
+      // 点击查看详情
+      historyItem.addEventListener('click', () => showImageDetails(image));
+      
+      historyGrid.appendChild(historyItem);
+    });
   }
   
   // 渲染分页
@@ -823,10 +837,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // 积分使用记录分页变量
-  let creditCurrentPage = 1;
-  const creditItemsPerPage = 10;
-  let creditTotalPages = 1;
+  // 积分使用记录分页变量已移至页面顶部
   
   // 加载积分使用记录
   async function loadCreditsUsageHistory() {
