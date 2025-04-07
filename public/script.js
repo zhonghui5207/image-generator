@@ -802,8 +802,61 @@ document.addEventListener('DOMContentLoaded', () => {
                     const requiredCredits = data.content.requiredCredits || 1;
                     const currentCredits = data.content.currentCredits || 0;
                     const creditsNeeded = data.content.creditsNeeded || (requiredCredits - currentCredits);
+                    const modelName = data.content.model || '';
                     
-                    showError(`积分不足！需要 ${requiredCredits} 积分，您当前只有 ${currentCredits} 积分。还需要 ${creditsNeeded} 积分。请前往个人中心充值。`);
+                    // 获取模型的友好显示名称
+                    let modelDisplayName = '标准模式';
+                    if (modelName === 'gpt-4o-all') {
+                      modelDisplayName = '高级模式';
+                    } else if (modelName === 'gpt-4o-image-vip') {
+                      modelDisplayName = '专业模式';
+                    } else if (modelName === 'gpt-4-vision-preview') {
+                      modelDisplayName = '旧版模式';
+                    } else if (modelName === 'gpt-4o-image') {
+                      modelDisplayName = '标准模式';
+                    }
+                    
+                    showError(`
+                      <div class="error-box">
+                        <div class="error-title">积分不足</div>
+                        <div class="error-content">
+                          <p>您选择的「${modelDisplayName}」需要 <strong>${requiredCredits}</strong> 积分，您当前只有 <strong>${currentCredits}</strong> 积分。</p>
+                          <p>还需要充值 <strong>${creditsNeeded}</strong> 积分才能使用该模式。</p>
+                          <div class="error-action">
+                            <a href="/credits.html" class="btn btn-primary btn-sm">前往充值</a>
+                            <button class="btn btn-outline-secondary btn-sm error-close-btn">关闭</button>
+                          </div>
+                        </div>
+                      </div>
+                      <style>
+                        .error-box {
+                          background-color: #fff;
+                          border-radius: 8px;
+                          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                          overflow: hidden;
+                          max-width: 450px;
+                          margin: 0 auto;
+                        }
+                        .error-title {
+                          background-color: #f44336;
+                          color: white;
+                          padding: 12px 15px;
+                          font-weight: bold;
+                          font-size: 16px;
+                        }
+                        .error-content {
+                          padding: 15px;
+                        }
+                        .error-content p {
+                          margin-bottom: 10px;
+                        }
+                        .error-action {
+                          margin-top: 15px;
+                          display: flex;
+                          gap: 10px;
+                        }
+                      </style>
+                    `);
                   } else {
                     // 其他错误
                     showError(data.content.message || '生成图像时出现错误');
@@ -980,15 +1033,69 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectedModel = document.querySelector('input[name="model"]:checked').value;
     
     // 确定消耗的积分数量
-    let creditsToUse = 1; // 默认消耗1积分
-    if (selectedModel === 'gpt-4o-image-vip') {
-      creditsToUse = 2; // VIP模型消耗2积分
+    let creditsToUse = 4; // 标准模式消耗4积分
+    let modelDisplayName = '标准模式';
+    
+    // 根据选择的模型设置消耗积分
+    if (selectedModel === 'gpt-4o-image') {
+      creditsToUse = 4; // 标准模式消耗4积分
+      modelDisplayName = '标准模式';
+    } else if (selectedModel === 'gpt-4o-all') {
+      creditsToUse = 5; // 高级模式消耗5积分
+      modelDisplayName = '高级模式';
+    } else if (selectedModel === 'gpt-4o-image-vip') {
+      creditsToUse = 8; // 专业模式消耗8积分
+      modelDisplayName = '专业模式';
+    } else if (selectedModel === 'gpt-4-vision-preview') {
+      creditsToUse = 2; // 旧版模式消耗2积分
+      modelDisplayName = '旧版模式';
     }
     
     // 检查用户积分是否足够
     const user = JSON.parse(localStorage.getItem('user') || 'null');
     if (user && user.credits < creditsToUse) {
-      showError(`积分不足！${selectedModel === 'gpt-4o-image-vip' ? 'VIP模型需要2积分' : '生成图像需要1积分'}，您当前只有 ${user.credits} 积分。`);
+      const creditsNeeded = creditsToUse - user.credits;
+      showError(`
+        <div class="error-box">
+          <div class="error-title">积分不足</div>
+          <div class="error-content">
+            <p>您选择的「${modelDisplayName}」需要 <strong>${creditsToUse}</strong> 积分，您当前只有 <strong>${user.credits}</strong> 积分。</p>
+            <p>还需要充值 <strong>${creditsNeeded}</strong> 积分才能使用该模式。</p>
+            <div class="error-action">
+              <a href="/credits.html" class="btn btn-primary btn-sm">前往充值</a>
+              <button class="btn btn-outline-secondary btn-sm error-close-btn">关闭</button>
+            </div>
+          </div>
+        </div>
+        <style>
+          .error-box {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            overflow: hidden;
+            max-width: 450px;
+            margin: 0 auto;
+          }
+          .error-title {
+            background-color: #f44336;
+            color: white;
+            padding: 12px 15px;
+            font-weight: bold;
+            font-size: 16px;
+          }
+          .error-content {
+            padding: 15px;
+          }
+          .error-content p {
+            margin-bottom: 10px;
+          }
+          .error-action {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+          }
+        </style>
+      `);
       uploadForm.parentElement.hidden = false;
       loadingIndicator.style.display = 'none';
       return;
@@ -1190,9 +1297,19 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 重置进度条（如果存在）
     
-    // 显示错误信息
-    errorMessage.textContent = message || '生成图像时出现错误';
-    errorContainer.style.display = 'block';
+    // 显示错误信息 - 支持HTML内容
+    errorMessage.innerHTML = message || '生成图像时出现错误';
+    errorContainer.style.display = 'flex';
+    
+    // 为错误框中的关闭按钮添加点击事件
+    setTimeout(() => {
+      const closeBtn = document.querySelector('.error-close-btn');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+          errorContainer.style.display = 'none';
+        });
+      }
+    }, 100);
     
     // 重置表单状态，确保用户可以重新尝试
     uploadForm.parentElement.hidden = false;
