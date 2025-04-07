@@ -130,6 +130,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // 页面加载时检查认证状态
+  // 检查是否有重定向消息需要显示
+  function checkRedirectMessage() {
+    if (window.location.pathname.includes('login.html')) {
+      const redirectMessage = localStorage.getItem('authRedirectMessage');
+      if (redirectMessage) {
+        // 显示消息
+        const errorElement = document.getElementById('login-error');
+        if (errorElement) {
+          errorElement.textContent = redirectMessage;
+          errorElement.style.display = 'block';
+          
+          // 显示后清除消息，避免刷新页面后仍然显示
+          localStorage.removeItem('authRedirectMessage');
+        }
+      }
+    }
+  }
+  
+  // 页面加载时检查认证状态和重定向消息
   checkAuth();
+  checkRedirectMessage();
 });

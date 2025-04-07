@@ -270,9 +270,12 @@
             // 手机号已被绑定，先退出登录再重定向到登录页面
             try {
               await fetch('/api/auth/logout', { method: 'POST' });
+              // 在本地存储中保存错误信息，以便在登录页面显示
+              localStorage.setItem('authRedirectMessage', '该手机号已被其他账号绑定，请直接登录或使用其他手机号');
               window.location.href = '/login.html';
             } catch (error) {
               console.error('退出登录失败:', error);
+              localStorage.setItem('authRedirectMessage', '该手机号已被其他账号绑定，请直接登录或使用其他手机号');
               window.location.href = '/login.html';
             }
           } else {
