@@ -255,13 +255,26 @@ document.addEventListener('DOMContentLoaded', function() {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('API返回数据:', data);
         
-        // 更新总页数
-        totalPages = Math.ceil(data.total / itemsPerPage);
-        console.log(`总记录数: ${data.total}, 每页显示: ${itemsPerPage}, 总页数: ${totalPages}`);
+        // 检查数据结构
+        if (data.pagination && typeof data.pagination.total === 'number') {
+          // 使用分页对象中的数据
+          totalPages = data.pagination.pages || Math.ceil(data.pagination.total / itemsPerPage);
+        } else if (typeof data.total === 'number') {
+          // 直接使用total字段
+          totalPages = Math.ceil(data.total / itemsPerPage);
+        } else {
+          // 如果没有总数信息，则基于图像数量估算
+          const imagesArray = data.images || [];
+          totalPages = Math.max(1, Math.ceil(imagesArray.length / itemsPerPage));
+        }
+        
+        console.log(`总记录数: ${data.pagination?.total || data.total || 'unknown'}, 每页显示: ${itemsPerPage}, 总页数: ${totalPages}`);
         
         // 渲染历史记录
-        renderHistory(data.images);
+        const images = data.images || [];
+        renderHistory(images);
         
         // 渲染分页
         renderPagination();
@@ -363,9 +376,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // 清空现有内容
     pagination.innerHTML = '';
     
+    // 确保 totalPages 是有效数字
+    if (isNaN(totalPages) || totalPages <= 0) {
+      totalPages = 1;
+    }
+    
     if (totalPages <= 1) {
       console.log('总页数小于等于1，不显示分页');
       return;
+    }
+    
+    // 确保 currentPage 是有效数字且在范围内
+    if (isNaN(currentPage) || currentPage < 1) {
+      currentPage = 1;
+    } else if (currentPage > totalPages) {
+      currentPage = totalPages;
     }
     
     console.log(`渲染分页控件: 当前页 ${currentPage}, 总页数 ${totalPages}`);
@@ -410,7 +435,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const nextBtn = document.createElement('button');
     nextBtn.className = 'pagination-btn';
     nextBtn.textContent = '下一页';
-    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.disabled = currentPage >= totalPages;
     nextBtn.addEventListener('click', () => {
       if (currentPage < totalPages) {
         currentPage++;
