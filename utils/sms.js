@@ -36,11 +36,18 @@ export async function sendVerificationCode(phoneNumber, code) {
     // 净化手机号，去掉+86前缀
     const cleanPhoneNumber = phoneNumber.replace('+86', '');
     
+    // 使用专门的手机绑定短信模板ID，如果未配置则使用默认模板
+    const bindPhoneTemplateId = process.env.TENCENT_SMS_BIND_PHONE_TEMPLATE_ID;
+  
+    if (!bindPhoneTemplateId) {
+      console.warn('未配置手机绑定短信模板ID，将使用默认验证码模板');
+    }
+  
     const params = {
       PhoneNumberSet: [cleanPhoneNumber],
       SmsSdkAppId: process.env.TENCENT_SMS_SDK_APP_ID,
       SignName: process.env.TENCENT_SMS_SIGN_NAME,
-      TemplateId: process.env.TENCENT_SMS_TEMPLATE_ID,
+      TemplateId: bindPhoneTemplateId || process.env.TENCENT_SMS_TEMPLATE_ID,
       TemplateParamSet: [code],
     };
     
@@ -148,14 +155,18 @@ export async function sendPasswordResetCode(phoneNumber, code) {
     const resetPasswordTemplateId = process.env.TENCENT_SMS_RESET_PASSWORD_TEMPLATE_ID;
     
     if (!resetPasswordTemplateId) {
-      console.warn('未配置密码重置短信模板ID，将使用默认验证码模板');
+      console.error('未配置密码重置短信模板ID！这是必须的配置项');
+      return {
+        success: false,
+        message: '系统配置错误：未配置密码重置短信模板'
+      };
     }
     
     const params = {
       PhoneNumberSet: [cleanPhoneNumber],
       SmsSdkAppId: process.env.TENCENT_SMS_SDK_APP_ID,
       SignName: process.env.TENCENT_SMS_SIGN_NAME,
-      TemplateId: resetPasswordTemplateId || process.env.TENCENT_SMS_TEMPLATE_ID, // 如果未配置特定模板，则使用默认模板
+      TemplateId: resetPasswordTemplateId,
       TemplateParamSet: [code],
     };
     

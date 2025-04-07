@@ -293,23 +293,28 @@ router.post('/verify-reset-code', async (req, res) => {
 // 重置密码
 router.post('/reset-password', async (req, res) => {
   try {
-    const { phoneNumber, newPassword } = req.body;
+    const { phoneNumber, code, newPassword } = req.body;
     
-    if (!phoneNumber || !newPassword) {
-      return res.status(400).json({ success: false, message: '手机号和新密码不能为空' });
+    if (!phoneNumber || !code || !newPassword) {
+      return res.status(400).json({ success: false, message: '手机号、验证码和新密码不能为空' });
     }
     
     // 检查是否通过验证码验证
     const storedData = resetPasswordCodes[phoneNumber];
     if (!storedData) {
-      return res.status(400).json({ success: false, message: '请先验证手机验证码' });
+      return res.status(400).json({ success: false, message: '请先获取手机验证码' });
     }
     
     // 检查验证码是否过期
     if (Date.now() > storedData.expireAt) {
       // 删除过期验证码
       delete resetPasswordCodes[phoneNumber];
-      return res.status(400).json({ success: false, message: '验证码已过期，请重新验证' });
+      return res.status(400).json({ success: false, message: '验证码已过期，请重新获取' });
+    }
+    
+    // 验证码是否匹配
+    if (storedData.code !== code) {
+      return res.status(400).json({ success: false, message: '验证码不正确' });
     }
     
     // 查找用户
