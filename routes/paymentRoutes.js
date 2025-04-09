@@ -761,6 +761,9 @@ router.post('/cancel-order/:orderNumber', authenticate, async (req, res) => {
 // 微信支付回调通知
 router.post('/wechat-notify', express.text({ type: 'text/xml' }), async (req, res) => {
   try {
+    console.log('收到微信支付回调请求');
+    console.log('原始数据:', req.body);
+    
     // 解析XML数据
     const notifyData = {};
     const regex = /<([\w_]+)>(.*?)<\/\1>/g;
@@ -770,13 +773,15 @@ router.post('/wechat-notify', express.text({ type: 'text/xml' }), async (req, re
       notifyData[match[1]] = match[2];
     }
     
-    console.log('收到微信支付回调:', notifyData);
+    console.log('解析后的回调数据:', notifyData);
     
     // 验证签名
     if (!verifyNotifySign(notifyData)) {
       console.error('微信支付回调验签失败');
       return res.send('<xml><return_code><![CDATA[FAIL]]></return_code><return_msg><![CDATA[签名验证失败]]></return_msg></xml>');
     }
+    
+    console.log('签名验证通过');
     
     // 检查返回结果
     if (notifyData.return_code !== 'SUCCESS' || notifyData.result_code !== 'SUCCESS') {
@@ -789,6 +794,8 @@ router.post('/wechat-notify', express.text({ type: 'text/xml' }), async (req, re
     const transactionId = notifyData.transaction_id;
     const totalFee = parseInt(notifyData.total_fee) / 100; // 转换为元
     
+    console.log(`处理订单 ${orderNumber}, 交易号 ${transactionId}, 金额 ${totalFee}元`);
+    
     // 查询订单
     const order = await Order.findOne({ orderNumber });
     
@@ -796,6 +803,8 @@ router.post('/wechat-notify', express.text({ type: 'text/xml' }), async (req, re
       console.error('微信支付回调找不到订单:', orderNumber);
       return res.send('<xml><return_code><![CDATA[FAIL]]></return_code><return_msg><![CDATA[订单不存在]]></return_msg></xml>');
     }
+    
+    console.log('找到订单:', order);
     
     // 检查订单金额是否一致（允许1分钱的误差）
     if (Math.abs(order.amount - totalFee) > 0.01) {
@@ -809,21 +818,29 @@ router.post('/wechat-notify', express.text({ type: 'text/xml' }), async (req, re
       return res.send('<xml><return_code><![CDATA[SUCCESS]]></return_code><return_msg><![CDATA[OK]]></return_msg></xml>');
     }
     
+    console.log('开始更新订单状态...');
+    
     // 更新订单状态
     order.status = 'paid';
     order.transactionId = transactionId;
     order.paymentTime = new Date();
     await order.save();
     
+    console.log('订单状态已更新为已支付');
+    
     // 给用户添加积分
+    console.log(`准备给用户 ${order.user} 添加 ${order.credits} 积分`);
     await addCredits(order.user, order.credits, `购买积分 - 订单号:${order.orderNumber}`);
+    console.log('积分添加成功');
     
     // 更新用户总消费金额
     await User.findByIdAndUpdate(order.user, {
       $inc: { totalSpent: order.amount }
     });
+    console.log(`用户总消费金额已更新，增加 ${order.amount} 元`);
     
     // 返回成功
+    console.log('处理完成，返回成功响应');
     res.send('<xml><return_code><![CDATA[SUCCESS]]></return_code><return_msg><![CDATA[OK]]></return_msg></xml>');
     
   } catch (error) {

@@ -9,8 +9,22 @@ const config = {
   appId: process.env.WECHAT_APP_ID, // 微信开放平台 appid
   mchId: process.env.WECHAT_MCH_ID, // 微信支付商户号
   mchKey: process.env.WECHAT_API_KEY, // 商户API密钥
-  notifyUrl: process.env.WECHAT_NOTIFY_URL // 支付结果通知回调地址
+  notifyUrl: process.env.WECHAT_NOTIFY_URL || 'https://kdy-imagic.lovexstory.com/api/payment/wechat-notify' // 支付结果通知回调地址
 };
+
+// 验证配置
+console.log('微信支付配置初始化...');
+if (!config.appId || !config.mchId || !config.mchKey) {
+  console.error('缺少必要的微信支付配置参数');
+} else {
+  console.log('微信支付配置加载完成');
+  console.log('回调通知地址:', config.notifyUrl);
+  
+  // 验证回调URL是否使用HTTPS
+  if (!config.notifyUrl.startsWith('https://')) {
+    console.warn('警告: 回调通知URL必须使用HTTPS协议');
+  }
+}
 
 /**
  * 生成随机字符串
@@ -330,17 +344,36 @@ export async function createWechatPayment(orderData) {
  * @returns {boolean} 是否验签成功
  */
 export function verifyNotifySign(notifyData) {
-  // 提取微信返回的签名
-  const wxSign = notifyData.sign;
-  
-  // 删除签名字段，重新计算签名
-  delete notifyData.sign;
-  
-  // 生成我方签名
-  const sign = generateSign(notifyData);
-  
-  // 比较签名是否一致
-  return sign === wxSign;
+  try {
+    console.log('开始验证微信支付回调签名...');
+    console.log('回调数据:', JSON.stringify(notifyData));
+    
+    // 提取微信返回的签名
+    const wxSign = notifyData.sign;
+    if (!wxSign) {
+      console.error('回调数据中没有签名字段');
+      return false;
+    }
+    
+    // 删除签名字段，重新计算签名
+    const dataForSign = { ...notifyData };
+    delete dataForSign.sign;
+    
+    // 生成我方签名
+    const sign = generateSign(dataForSign);
+    
+    console.log('微信签名:', wxSign);
+    console.log('本地签名:', sign);
+    
+    // 比较签名是否一致
+    const isValid = sign === wxSign;
+    console.log('签名验证结果:', isValid ? '验证通过' : '验证失败');
+    
+    return isValid;
+  } catch (error) {
+    console.error('验证签名时发生错误:', error);
+    return false;
+  }
 }
 
 /**
