@@ -766,11 +766,12 @@ router.post('/wechat-notify', express.text({ type: 'text/xml' }), async (req, re
     
     // 解析XML数据
     const notifyData = {};
-    const regex = /<([\w_]+)>(.*?)<\/\1>/g;
-    let match;
+    const xmlRegex = /<([\w_]+)>(?:<!\[CDATA\[(.*?)\]\]>|([^<]*))<\/\1>/g;
+    let xmlMatch;
     
-    while ((match = regex.exec(req.body)) !== null) {
-      notifyData[match[1]] = match[2];
+    while ((xmlMatch = xmlRegex.exec(req.body)) !== null) {
+      // 使用 CDATA 中的值或普通文本值
+      notifyData[xmlMatch[1]] = xmlMatch[2] || xmlMatch[3];
     }
     
     console.log('解析后的回调数据:', notifyData);

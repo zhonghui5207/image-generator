@@ -346,7 +346,6 @@ export async function createWechatPayment(orderData) {
 export function verifyNotifySign(notifyData) {
   try {
     console.log('开始验证微信支付回调签名...');
-    console.log('回调数据:', JSON.stringify(notifyData));
     
     // 提取微信返回的签名
     const wxSign = notifyData.sign;
