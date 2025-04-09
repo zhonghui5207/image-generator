@@ -687,7 +687,7 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
               const ossPath = `kdy-generated/${Date.now()}_openai_image.jpg`;
               
               // 上传图片二进制内容到OSS
-              const result = await ossClient.put(ossPath, imageBuffer);
+              const result = await ossClient.client.put(ossPath, imageBuffer);
               
               // 生成可访问的URL
               const url = process.env.OSS_BUCKET_URL 
