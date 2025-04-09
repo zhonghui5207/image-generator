@@ -8,14 +8,10 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/imageg
 
 // 连接选项
 const mongooseOptions = {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
   maxPoolSize: 10,               // 连接池大小
   socketTimeoutMS: 45000,        // 套接字超时时间
   serverSelectionTimeoutMS: 5000,// 服务器选择超时
   heartbeatFrequencyMS: 10000,   // 心跳频率
-  keepAlive: true,               // 保持连接活跃
-  keepAliveInitialDelay: 300000, // 保持连接初始延迟
   autoIndex: true,               // 自动创建索引
   serverApi: {
     version: '1',                // 使用最新的服务器API版本
