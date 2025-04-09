@@ -25,21 +25,21 @@ const ossConfig = {
 };
 
 // 打印不包含敏感信息的配置
-console.log('OSS配置信息: ', {
-  region: ossConfig.region,
-  bucket: ossConfig.bucket,
-  endpoint: ossConfig.endpoint,
-  internal: ossConfig.internal,
-  secure: ossConfig.secure,
-  hasAccessKeyId: !!ossConfig.accessKeyId,
-  hasAccessKeySecret: !!ossConfig.accessKeySecret
-});
+// console.log('OSS配置信息: ', {
+//   region: ossConfig.region,
+//   bucket: ossConfig.bucket,
+//   endpoint: ossConfig.endpoint,
+//   internal: ossConfig.internal,
+//   secure: ossConfig.secure,
+//   hasAccessKeyId: !!ossConfig.accessKeyId,
+//   hasAccessKeySecret: !!ossConfig.accessKeySecret
+// });
 
 // 创建OSS客户端实例
 let ossClient;
 try {
   ossClient = new OSS(ossConfig);
-  console.log('OSS客户端初始化成功');
+  // console.log('OSS客户端初始化成功');
 } catch (error) {
   console.error('OSS客户端初始化失败:', error);
   // 创建一个模拟客户端，避免应用崩溃

@@ -665,55 +665,45 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
             generatedImageUrl = originalImagePath || 'https://placehold.co/600x400?text=生成失败';
             isGenerationFailed = true; // 标记为生成失败
           } else if (useOSS && generatedImageUrl && generatedImageUrl.startsWith('http')) {
-            // 检查URL是否是直接可用的图片格式
-            const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
-            const isDirectImageUrl = imageExtensions.some(ext => 
-              generatedImageUrl.toLowerCase().endsWith(ext) || generatedImageUrl.toLowerCase().includes(`${ext}?`)
-            );
-            
-            if (!isDirectImageUrl) {
-              // 如果不是直接的图片URL，需要下载图片内容并上传到OSS
-              try {
-                console.log('将生成的图像从URL下载并上传到OSS:', generatedImageUrl);
-                // 使用fetch直接下载图片内容
-                const response = await fetch(generatedImageUrl, {
-                  timeout: 30000,
-                  headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                  }
-                });
-                
-                if (!response.ok) {
-                  throw new Error(`下载图片失败，HTTP状态: ${response.status}`);
+            // 无论URL格式如何，都下载图片内容并上传到OSS
+            try {
+              console.log('将生成的图像从URL下载并上传到OSS:', generatedImageUrl);
+              // 使用fetch直接下载图片内容
+              const response = await fetch(generatedImageUrl, {
+                timeout: 30000,
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 }
-                
-                // 获取图片二进制数据
-                const imageBuffer = Buffer.from(await response.arrayBuffer());
-                
-                // 生成文件名和OSS路径
-                const ossPath = `kdy-generated/${Date.now()}_openai_image.jpg`;
-                
-                // 上传图片二进制内容到OSS
-                const uploadResult = await ossClient.client.put(ossPath, imageBuffer);
-                
-                // 生成可访问的URL
-                const url = process.env.OSS_BUCKET_URL 
-                  ? `${process.env.OSS_BUCKET_URL}/${ossPath}`
-                  : uploadResult.url;
-                  
-                generatedImageUrl = url;
-                console.log('图像已下载并上传到OSS:', generatedImageUrl);
-              } catch (ossError) {
-                console.error('下载并上传生成图像到OSS失败，使用原始URL:', ossError);
-                // 出错时保留原URL
+              });
+              
+              if (!response.ok) {
+                throw new Error(`下载图片失败，HTTP状态: ${response.status}`);
               }
-            } else {
-              console.log('URL是直接的图片格式，不需要下载:', generatedImageUrl);
+              
+              // 获取图片二进制数据
+              const imageBuffer = Buffer.from(await response.arrayBuffer());
+              
+              // 生成文件名和OSS路径
+              const ossPath = `kdy-generated/${Date.now()}_openai_image.jpg`;
+              
+              // 上传图片二进制内容到OSS
+              const result = await ossClient.put(ossPath, imageBuffer);
+              
+              // 生成可访问的URL
+              const url = process.env.OSS_BUCKET_URL 
+                ? `${process.env.OSS_BUCKET_URL}/${ossPath}`
+                : result.url;
+                
+              generatedImageUrl = url;
+              console.log('图像已下载并上传到OSS:', generatedImageUrl);
+            } catch (ossError) {
+              console.error('下载并上传生成图像到OSS失败，使用原始URL:', ossError);
+              // 出错时保留原URL
             }
           }
           
           // 扣除用户积分 - 根据生成结果调整积分消耗
-          const actualCreditsToUse = isGenerationFailed ? 1 : creditsToUse; // 如果生成失败，只扣1积分
+          const actualCreditsToUse = isGenerationFailed ? 1 : creditsToUse; // 如果生成失败，只我1积分
           
           const newCreditBalance = await useCredits(
             req.user._id, 
@@ -867,50 +857,40 @@ app.post('/api/generate-image', authenticate, checkCredits, upload.single('image
           generatedImageUrl = originalImagePath;
           isGenerationFailed = true; // 标记为生成失败
         } else if (useOSS && generatedImageUrl && generatedImageUrl.startsWith('http')) {
-          // 检查URL是否是直接可用的图片格式
-          const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
-          const isDirectImageUrl = imageExtensions.some(ext => 
-            generatedImageUrl.toLowerCase().endsWith(ext) || generatedImageUrl.toLowerCase().includes(`${ext}?`)
-          );
-          
-          if (!isDirectImageUrl) {
-            // 如果不是直接的图片URL，需要下载图片内容并上传到OSS
-            try {
-              console.log('将生成的图像从URL下载并上传到OSS:', generatedImageUrl);
-              // 使用fetch直接下载图片内容
-              const response = await fetch(generatedImageUrl, {
-                timeout: 30000,
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                }
-              });
-              
-              if (!response.ok) {
-                throw new Error(`下载图片失败，HTTP状态: ${response.status}`);
+          // 无论URL格式如何，都下载图片内容并上传到OSS
+          try {
+            console.log('将生成的图像从URL下载并上传到OSS:', generatedImageUrl);
+            // 使用fetch直接下载图片内容
+            const response = await fetch(generatedImageUrl, {
+              timeout: 30000,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
               }
-              
-              // 获取图片二进制数据
-              const imageBuffer = Buffer.from(await response.arrayBuffer());
-              
-              // 生成文件名和OSS路径
-              const ossPath = `kdy-generated/${Date.now()}_openai_image.jpg`;
-              
-              // 上传图片二进制内容到OSS
-              const uploadResult = await ossClient.client.put(ossPath, imageBuffer);
-              
-              // 生成可访问的URL
-              const url = process.env.OSS_BUCKET_URL 
-                ? `${process.env.OSS_BUCKET_URL}/${ossPath}`
-                : uploadResult.url;
-                
-              generatedImageUrl = url;
-              console.log('图像已下载并上传到OSS:', generatedImageUrl);
-            } catch (ossError) {
-              console.error('下载并上传生成图像到OSS失败，使用原始URL:', ossError);
-              // 出错时保留原URL
+            });
+            
+            if (!response.ok) {
+              throw new Error(`下载图片失败，HTTP状态: ${response.status}`);
             }
-          } else {
-            console.log('URL是直接的图片格式，不需要下载:', generatedImageUrl);
+            
+            // 获取图片二进制数据
+            const imageBuffer = Buffer.from(await response.arrayBuffer());
+            
+            // 生成文件名和OSS路径
+            const ossPath = `kdy-generated/${Date.now()}_openai_image.jpg`;
+            
+            // 上传图片二进制内容到OSS
+            const uploadResult = await ossClient.client.put(ossPath, imageBuffer);
+            
+            // 生成可访问的URL
+            const url = process.env.OSS_BUCKET_URL 
+              ? `${process.env.OSS_BUCKET_URL}/${ossPath}`
+              : uploadResult.url;
+              
+            generatedImageUrl = url;
+            console.log('图像已下载并上传到OSS:', generatedImageUrl);
+          } catch (ossError) {
+            console.error('下载并上传生成图像到OSS失败，使用原始URL:', ossError);
+            // 出错时保留原URL
           }
         }
         

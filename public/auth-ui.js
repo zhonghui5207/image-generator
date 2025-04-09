@@ -12,15 +12,15 @@ document.addEventListener('DOMContentLoaded', function() {
   const authRequiredElements = document.querySelectorAll('.auth-required');
   const authNotRequiredElements = document.querySelectorAll('.auth-not-required');
   
-  console.log('需要认证的元素数量:', authRequiredElements.length);
-  console.log('不需要认证的元素数量:', authNotRequiredElements.length);
+  // console.log('需要认证的元素数量:', authRequiredElements.length);
+  // console.log('不需要认证的元素数量:', authNotRequiredElements.length);
   
   // 根据认证状态显示/隐藏元素
   if (isAuthenticated) {
     // 显示需要认证的元素，隐藏不需要认证的元素
     authRequiredElements.forEach(el => {
       el.style.display = '';
-      console.log('显示元素:', el.id || el.className);
+      // console.log('显示元素:', el.id || el.className);
     });
     
     authNotRequiredElements.forEach(el => {
@@ -125,19 +125,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // 隐藏需要认证的元素，显示不需要认证的元素
     authRequiredElements.forEach(el => {
       el.style.display = 'none';
-      console.log('隐藏元素:', el.id || el.className);
+      // console.log('隐藏元素:', el.id || el.className);
     });
     
     authNotRequiredElements.forEach(el => {
       el.style.display = '';
-      console.log('显示元素:', el.id || el.className);
+      // console.log('显示元素:', el.id || el.className);
     });
     
     // 显示未登录提示横幅
     const authBanner = document.getElementById('auth-banner');
     if (authBanner) {
       authBanner.style.display = '';
-      console.log('显示未登录提示横幅');
+      // console.log('显示未登录提示横幅');
     }
   }
   

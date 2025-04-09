@@ -5,7 +5,7 @@ import User from '../models/User.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_change_this_in_production';
 
 // 确保 JWT_SECRET 已设置
-console.log('JWT_SECRET 是否已设置:', !!JWT_SECRET);
+// console.log('JWT_SECRET 是否已设置:', !!JWT_SECRET);
 if (!JWT_SECRET) {
   console.error('警告: JWT_SECRET 未设置，使用默认值。在生产环境中这是不安全的。');
 }
@@ -21,16 +21,16 @@ export const generateToken = (userId) => {
 // 验证JWT令牌中间件
 export const authenticate = async (req, res, next) => {
   try {
-    console.log('认证中间件已调用，路径:', req.path);
+    // console.log('认证中间件已调用，路径:', req.path);
     
     // 从cookie或请求头中获取令牌
     const token = req.cookies.token || 
                  (req.headers.authorization && req.headers.authorization.startsWith('Bearer') 
                   ? req.headers.authorization.split(' ')[1] : null);
     
-    console.log('令牌是否存在:', !!token);
-    console.log('Cookie内容:', req.cookies);
-    console.log('Authorization头:', req.headers.authorization);
+    // console.log('令牌是否存在:', !!token);
+    // console.log('Cookie内容:', req.cookies);
+    // console.log('Authorization头:', req.headers.authorization);
     
     if (!token) {
       console.log('未找到令牌，返回未授权错误');
@@ -40,7 +40,7 @@ export const authenticate = async (req, res, next) => {
     // 验证令牌
     console.log('开始验证令牌...');
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('令牌验证成功，用户ID:', decoded.userId);
+    // console.log('令牌验证成功，用户ID:', decoded.userId);
     
     // 查找用户
     console.log('开始查找用户...');
