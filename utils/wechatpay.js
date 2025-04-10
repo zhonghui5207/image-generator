@@ -46,19 +46,13 @@ function generateNonceStr(length = 32) {
  * @returns {string} 签名
  */
 function generateSign(params) {
-  console.log('开始生成签名，原始参数:', JSON.stringify(params));
-  
   // 按照微信支付要求，组装签名参数
   const sortedParams = Object.keys(params).sort().reduce((result, key) => {
     if (params[key] !== '' && params[key] !== undefined && params[key] !== null && key !== 'sign') {
       result[key] = params[key];
-    } else {
-      console.log(`排除参数: ${key}=${params[key]}`);
     }
     return result;
   }, {});
-  
-  console.log('排序后的参数:', JSON.stringify(sortedParams));
   
   // 将参数转换为字符串
   let stringA = '';
@@ -66,17 +60,11 @@ function generateSign(params) {
     stringA += `${key}=${sortedParams[key]}&`;
   }
   
-  console.log('参数字符串:', stringA);
-  
   // 拼接API密钥
   const stringSignTemp = `${stringA}key=${config.mchKey}`;
   
-  console.log('待签名字符串:', stringSignTemp);
-  console.log('API密钥长度:', config.mchKey.length);
-  
   // MD5加密并转为大写
   const sign = crypto.createHash('md5').update(stringSignTemp).digest('hex').toUpperCase();
-  console.log('生成的签名:', sign);
   
   return sign;
 }
@@ -360,9 +348,6 @@ export async function createWechatPayment(orderData) {
 export function verifyNotifySign(notifyData) {
   try {
     console.log('开始验证微信支付回调签名...');
-    console.log('回调原始数据:', JSON.stringify(notifyData));
-    console.log('商户ID:', config.mchId);
-    console.log('应用ID:', config.appId);
     
     // 提取微信返回的签名
     const wxSign = notifyData.sign;
@@ -374,9 +359,6 @@ export function verifyNotifySign(notifyData) {
     // 检查必要字段
     if (!notifyData.appid || !notifyData.mch_id || !notifyData.nonce_str) {
       console.error('回调数据缺少必要字段');
-      console.log('appid:', notifyData.appid);
-      console.log('mch_id:', notifyData.mch_id);
-      console.log('nonce_str:', notifyData.nonce_str);
       return false;
     }
     
@@ -393,8 +375,6 @@ export function verifyNotifySign(notifyData) {
     // 删除签名字段，重新计算签名
     const dataForSign = { ...notifyData };
     delete dataForSign.sign;
-    
-    console.log('用于生成签名的数据:', JSON.stringify(dataForSign));
     
     // 生成我方签名
     const sign = generateSign(dataForSign);
@@ -419,10 +399,8 @@ export function verifyNotifySign(notifyData) {
       const alternativeSign = generateSign(alternativeDataForSign);
       const alternativeIsValid = alternativeSign === wxSign;
       
-      console.log('尝试替代签名方法，结果:', alternativeIsValid ? '验证通过' : '验证失败');
-      console.log('替代签名:', alternativeSign);
-      
       if (alternativeIsValid) {
+        console.log('使用替代签名方法验证通过');
         return true;
       }
     }

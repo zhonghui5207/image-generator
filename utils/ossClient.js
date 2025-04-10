@@ -87,7 +87,7 @@ export async function uploadToOSS(file, customPath = 'kdy-uploads/') {
       ? `${process.env.OSS_BUCKET_URL}/${ossPath}`
       : result.url;
     
-    console.log(`文件已上传到OSS: ${url}`);
+    // console.log(`文件已上传到OSS: ${url}`);
     
     return {
       success: true,
@@ -147,7 +147,7 @@ export async function uploadFromSourceToOSS(source, customPath = 'kdy-generated/
       ? `${process.env.OSS_BUCKET_URL}/${ossPath}`
       : result.url;
     
-    console.log(`来源 ${source} 已上传到OSS: ${url}`);
+    // console.log(`来源 ${source} 已上传到OSS: ${url}`);
     
     return {
       success: true,
@@ -170,7 +170,7 @@ export async function uploadFromSourceToOSS(source, customPath = 'kdy-generated/
 export async function deleteFromOSS(ossPath) {
   try {
     const result = await ossClient.delete(ossPath);
-    console.log(`文件已从OSS删除: ${ossPath}`);
+    // console.log(`文件已从OSS删除: ${ossPath}`);
     return {
       success: true,
       path: ossPath,
