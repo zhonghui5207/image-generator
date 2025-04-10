@@ -46,13 +46,19 @@ function generateNonceStr(length = 32) {
  * @returns {string} 签名
  */
 function generateSign(params) {
+  console.log('开始生成签名，原始参数:', JSON.stringify(params));
+  
   // 按照微信支付要求，组装签名参数
   const sortedParams = Object.keys(params).sort().reduce((result, key) => {
     if (params[key] !== '' && params[key] !== undefined && params[key] !== null && key !== 'sign') {
       result[key] = params[key];
+    } else {
+      console.log(`排除参数: ${key}=${params[key]}`);
     }
     return result;
   }, {});
+  
+  console.log('排序后的参数:', JSON.stringify(sortedParams));
   
   // 将参数转换为字符串
   let stringA = '';
@@ -60,11 +66,19 @@ function generateSign(params) {
     stringA += `${key}=${sortedParams[key]}&`;
   }
   
+  console.log('参数字符串:', stringA);
+  
   // 拼接API密钥
   const stringSignTemp = `${stringA}key=${config.mchKey}`;
   
+  console.log('待签名字符串:', stringSignTemp);
+  console.log('API密钥长度:', config.mchKey.length);
+  
   // MD5加密并转为大写
-  return crypto.createHash('md5').update(stringSignTemp).digest('hex').toUpperCase();
+  const sign = crypto.createHash('md5').update(stringSignTemp).digest('hex').toUpperCase();
+  console.log('生成的签名:', sign);
+  
+  return sign;
 }
 
 /**
@@ -72,7 +86,7 @@ function generateSign(params) {
  * @param {string} xml XML字符串
  * @returns {Object} JS对象
  */
-function parseXML(xml) {
+export function parseXML(xml) {
   const result = {};
   
   // 处理基本的XML标签
@@ -105,7 +119,7 @@ function parseXML(xml) {
  * @param {Object} obj JS对象
  * @returns {string} XML字符串
  */
-function objectToXML(obj) {
+export function objectToXML(obj) {
   let xml = '<xml>';
   for (const key in obj) {
     if (obj[key] !== undefined && obj[key] !== null) {
@@ -346,6 +360,9 @@ export async function createWechatPayment(orderData) {
 export function verifyNotifySign(notifyData) {
   try {
     console.log('开始验证微信支付回调签名...');
+    console.log('回调原始数据:', JSON.stringify(notifyData));
+    console.log('商户ID:', config.mchId);
+    console.log('应用ID:', config.appId);
     
     // 提取微信返回的签名
     const wxSign = notifyData.sign;
@@ -354,9 +371,30 @@ export function verifyNotifySign(notifyData) {
       return false;
     }
     
+    // 检查必要字段
+    if (!notifyData.appid || !notifyData.mch_id || !notifyData.nonce_str) {
+      console.error('回调数据缺少必要字段');
+      console.log('appid:', notifyData.appid);
+      console.log('mch_id:', notifyData.mch_id);
+      console.log('nonce_str:', notifyData.nonce_str);
+      return false;
+    }
+    
+    // 检查商户ID是否匹配
+    if (notifyData.mch_id !== config.mchId) {
+      console.error(`商户ID不匹配: 回调中的 ${notifyData.mch_id}, 配置中的 ${config.mchId}`);
+    }
+    
+    // 检查应用ID是否匹配
+    if (notifyData.appid !== config.appId) {
+      console.error(`应用ID不匹配: 回调中的 ${notifyData.appid}, 配置中的 ${config.appId}`);
+    }
+    
     // 删除签名字段，重新计算签名
     const dataForSign = { ...notifyData };
     delete dataForSign.sign;
+    
+    console.log('用于生成签名的数据:', JSON.stringify(dataForSign));
     
     // 生成我方签名
     const sign = generateSign(dataForSign);
@@ -367,6 +405,27 @@ export function verifyNotifySign(notifyData) {
     // 比较签名是否一致
     const isValid = sign === wxSign;
     console.log('签名验证结果:', isValid ? '验证通过' : '验证失败');
+    
+    // 如果验证失败，尝试其他可能的问题
+    if (!isValid) {
+      // 尝试使用字符串形式的数字字段
+      const alternativeDataForSign = { ...dataForSign };
+      
+      // 确保所有数字字段都是字符串类型
+      if (alternativeDataForSign.total_fee && typeof alternativeDataForSign.total_fee !== 'string') {
+        alternativeDataForSign.total_fee = alternativeDataForSign.total_fee.toString();
+      }
+      
+      const alternativeSign = generateSign(alternativeDataForSign);
+      const alternativeIsValid = alternativeSign === wxSign;
+      
+      console.log('尝试替代签名方法，结果:', alternativeIsValid ? '验证通过' : '验证失败');
+      console.log('替代签名:', alternativeSign);
+      
+      if (alternativeIsValid) {
+        return true;
+      }
+    }
     
     return isValid;
   } catch (error) {

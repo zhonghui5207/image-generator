@@ -28,22 +28,22 @@ export const authenticate = async (req, res, next) => {
                  (req.headers.authorization && req.headers.authorization.startsWith('Bearer') 
                   ? req.headers.authorization.split(' ')[1] : null);
     
-    console.log('令牌是否存在:', !!token);
-    console.log('Cookie内容:', req.cookies);
-    console.log('Authorization头:', req.headers.authorization);
+    // console.log('令牌是否存在:', !!token);
+    // console.log('Cookie内容:', req.cookies);
+    // console.log('Authorization头:', req.headers.authorization);
     
     if (!token) {
-      console.log('未找到令牌，返回未授权错误');
+      // console.log('未找到令牌，返回未授权错误');
       return res.status(401).json({ success: false, message: '未授权，请登录' });
     }
     
     // 验证令牌
-    console.log('开始验证令牌...');
+    // console.log('开始验证令牌...');
     const decoded = jwt.verify(token, JWT_SECRET);
     // console.log('令牌验证成功，用户ID:', decoded.userId);
     
     // 查找用户
-    console.log('开始查找用户...');
+    // console.log('开始查找用户...');
     const user = await User.findById(decoded.userId).select('-password');
     
     if (!user) {
@@ -51,7 +51,7 @@ export const authenticate = async (req, res, next) => {
       return res.status(401).json({ success: false, message: '用户不存在' });
     }
     
-    console.log('认证成功，用户:', user.username);
+    // console.log('认证成功，用户:', user.username);
     
     // 将用户信息添加到请求对象
     req.user = user;

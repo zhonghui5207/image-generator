@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     authNotRequiredElements.forEach(el => {
       el.style.display = 'none';
-      console.log('隐藏元素:', el.id || el.className);
+      // console.log('隐藏元素:', el.id || el.className);
     });
     
     // 如果有积分显示区域，更新积分数量

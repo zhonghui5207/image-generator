@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from '../utils/auth.js';
 import Order from '../models/Order.js';
 import User from '../models/User.js';
-import { createWechatPayment, verifyNotifySign, queryOrderStatus, closeOrder, setOrderProvider } from '../utils/wechatpay.js';
+import { createWechatPayment, verifyNotifySign, queryOrderStatus, closeOrder, setOrderProvider, parseXML } from '../utils/wechatpay.js';
 import { addCredits } from './creditRoutes.js';
 import dotenv from 'dotenv';
 
@@ -761,24 +761,40 @@ router.post('/cancel-order/:orderNumber', authenticate, async (req, res) => {
 // 微信支付回调通知
 router.post('/wechat-notify', express.text({ type: 'text/xml' }), async (req, res) => {
   try {
-    console.log('收到微信支付回调请求');
-    console.log('原始数据:', req.body);
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] 收到微信支付回调请求`);
+    console.log(`[${timestamp}] 原始数据:`, req.body);
+    console.log(`[${timestamp}] 原始数据类型:`, typeof req.body);
+    console.log(`[${timestamp}] 原始数据长度:`, req.body.length);
+    console.log(`[${timestamp}] 请求头:`, JSON.stringify(req.headers));
     
-    // 解析XML数据
-    const notifyData = {};
-    const xmlRegex = /<([\w_]+)>(?:<!\[CDATA\[(.*?)\]\]>|([^<]*))<\/\1>/g;
-    let xmlMatch;
+    // 检查环境变量
+    console.log(`[${timestamp}] 商户ID:`, process.env.WECHAT_MCH_ID);
+    console.log(`[${timestamp}] 应用ID:`, process.env.WECHAT_APP_ID);
+    console.log(`[${timestamp}] API密钥长度:`, process.env.WECHAT_API_KEY ? process.env.WECHAT_API_KEY.length : 0);
     
-    while ((xmlMatch = xmlRegex.exec(req.body)) !== null) {
-      // 使用 CDATA 中的值或普通文本值
-      notifyData[xmlMatch[1]] = xmlMatch[2] || xmlMatch[3];
-    }
+    // 使用已导入的parseXML函数解析XML数据
+    console.log(`[${timestamp}] 开始解析XML数据...`);
+    const notifyData = parseXML(req.body);
     
-    console.log('解析后的回调数据:', notifyData);
+    console.log(`[${timestamp}] 解析后的回调数据:`, JSON.stringify(notifyData, null, 2));
+    console.log(`[${timestamp}] 解析后的数据类型:`, typeof notifyData);
+    console.log(`[${timestamp}] 解析后的数据字段数:`, Object.keys(notifyData).length);
+    console.log(`[${timestamp}] 解析后的数据字段:`, Object.keys(notifyData).join(', '));
+    
+    // 检查关键字段
+    console.log(`[${timestamp}] 回调中的商户ID:`, notifyData.mch_id);
+    console.log(`[${timestamp}] 回调中的应用ID:`, notifyData.appid);
+    console.log(`[${timestamp}] 回调中的签名:`, notifyData.sign);
+    console.log(`[${timestamp}] 回调中的随机字符串:`, notifyData.nonce_str);
     
     // 验证签名
-    if (!verifyNotifySign(notifyData)) {
-      console.error('微信支付回调验签失败');
+    console.log(`[${timestamp}] 开始验证签名...`);
+    const signResult = verifyNotifySign(notifyData);
+    console.log(`[${timestamp}] 签名验证结果:`, signResult ? '验证通过' : '验证失败');
+    
+    if (!signResult) {
+      console.error(`[${timestamp}] 微信支付回调验签失败`);
       return res.send('<xml><return_code><![CDATA[FAIL]]></return_code><return_msg><![CDATA[签名验证失败]]></return_msg></xml>');
     }
     
